@@ -144,9 +144,19 @@ export default function TripPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Đã đăng nhập thì hỏi database: chuyến này lưu vào tài khoản chưa?
+  // Đã đăng nhập: kiểm tra trạng thái lưu + hoàn tất "lưu đang chờ"
+  // (trường hợp bấm Lưu chuyến TRƯỚC khi đăng nhập -> app ghi nhớ ý định,
+  //  đăng nhập xong quay lại đây thì tự lưu nốt, khỏi bắt bấm lần 2)
   useEffect(() => {
     if (!session) { setSaved(false); return; }
+
+    const pending = localStorage.getItem("tripsplit_pending_save");
+    if (pending === code) {
+      localStorage.removeItem("tripsplit_pending_save");
+      supabase.rpc("save_trip_to_account", { p_code: code }).then(() => setSaved(true));
+      return;
+    }
+
     supabase.rpc("is_trip_saved", { p_code: code }).then(({ data }) => setSaved(!!data));
   }, [session, code]);
 
@@ -294,8 +304,17 @@ export default function TripPage() {
     load();
   }
 
-  // Lưu / bỏ lưu chuyến này khỏi tài khoản đang đăng nhập
+  // Lưu / bỏ lưu chuyến. Chưa đăng nhập mà bấm Lưu -> ghi nhớ ý định
+  // vào bộ nhớ trình duyệt rồi đưa đi đăng nhập, quay về sẽ tự lưu nốt.
   async function toggleSave() {
+    if (!session) {
+      localStorage.setItem("tripsplit_pending_save", code);
+      supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.href }, // đăng nhập xong quay về ĐÚNG trang chuyến này
+      });
+      return;
+    }
     const fn = saved ? "unsave_trip" : "save_trip_to_account";
     const { error } = await supabase.rpc(fn, { p_code: code });
     if (error) { alert("Thao tác lưu bị lỗi: " + error.message); return; }
@@ -361,12 +380,10 @@ export default function TripPage() {
               {members.map((m) => m.name).join(" · ")} — tổng chi <b>{fmt(totalVND)}</b>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {session && (
-                <button onClick={toggleSave}
-                  style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-                  {saved ? "✓ Đã lưu" : "☆ Lưu chuyến"}
-                </button>
-              )}
+              <button onClick={toggleSave}
+                style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                {saved ? "✓ Đã lưu" : "☆ Lưu chuyến"}
+              </button>
               <button onClick={copyLink}
                 style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
                 {copied ? "✓ Đã copy" : "🔗 Mời bạn nhập chung"}
