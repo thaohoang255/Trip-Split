@@ -175,6 +175,22 @@ export default function TripPage() {
   const balances = computeBalances(entries, members, rates);
   const transactions = settleDebts(balances, nameOf);
 
+  // Bảng chi tiết CHỈ ĐỂ HIỂN THỊ: tách khoản chi thật và chuyển tiền tay đôi
+  // (bộ máy tính tất toán ở trên vẫn gộp chung — toán đúng, chỉ trình bày là tách)
+  const detail = {};
+  members.forEach((m) => (detail[m.id] = { paidExp: 0, shareExp: 0, sent: 0, got: 0 }));
+  entries.forEach((e) => {
+    const vnd = toVND(e.amount, e.currency, rates);
+    if (e.type === "expense") {
+      if (detail[e.payer_id]) detail[e.payer_id].paidExp += vnd;
+      const perHead = vnd / e.participant_ids.length;
+      e.participant_ids.forEach((pid) => { if (detail[pid]) detail[pid].shareExp += perHead; });
+    } else {
+      if (detail[e.payer_id]) detail[e.payer_id].sent += vnd;
+      if (detail[e.participant_ids[0]]) detail[e.participant_ids[0]].got += vnd;
+    }
+  });
+
   const realExpenses = entries.filter((e) => e.type === "expense");
   const totalVND = realExpenses.reduce((s, e) => s + toVND(e.amount, e.currency, rates), 0);
   const prepaidList = realExpenses.filter((e) => e.prepaid);
@@ -362,6 +378,12 @@ export default function TripPage() {
         .tabbtn.on { color:${C.tealDark}; border-bottom-color:${C.coral}; }
         .typebtn { flex:1; padding:9px 0; border:1.5px solid ${C.line}; background:#fff; font-size:13.5px; font-weight:600; cursor:pointer; color:#7d8a90; }
         .typebtn.on { background:${C.ink}; border-color:${C.ink}; color:#fff; }
+        .hero { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; flex-wrap:wrap; }
+        .stub { border-left:1.5px dashed rgba(255,255,255,.4); padding-left:16px; }
+        /* Màn hình hẹp: cuống vé chiếm trọn hàng, đường xé xoay ngang như xé ngang thân vé */
+        @media (max-width: 560px) {
+          .stub { border-left:none; border-top:1.5px dashed rgba(255,255,255,.35); padding:12px 0 0; width:100%; margin-top:2px; }
+        }
       `}</style>
 
       {/* ===== HEADER ===== */}
@@ -376,7 +398,7 @@ export default function TripPage() {
           </a>
 
           {/* Hero trục trái kiểu dàn trang tạp chí; "cuống vé" tổng chi làm đối trọng bên phải */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 18, flexWrap: "wrap" }}>
+          <div className="hero">
             <div>
               <div style={{ fontSize: 11, letterSpacing: 2.5, opacity: 0.75, fontWeight: 600 }}>CHUYẾN ĐI</div>
               <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
@@ -390,7 +412,7 @@ export default function TripPage() {
               </div>
             </div>
             {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết */}
-            <div style={{ borderLeft: "1.5px dashed rgba(255,255,255,.4)", paddingLeft: 16 }}>
+            <div className="stub">
               <div style={{ fontSize: 10, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
               {/* Số vàng Selective trên nền Prussian — bắt cặp với máy bay vàng của logo */}
               <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2, color: "#FFB703" }}>{fmt(totalVND)}</div>
@@ -601,8 +623,15 @@ export default function TripPage() {
                     </div>
                   </div>
                   <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>
-                    Đã ứng/chuyển {fmt(b.paid)} · phần phải chịu {fmt(b.share)}
+                    Ứng cho chuyến {fmt(detail[m.id].paidExp)} · phần phải chịu {fmt(detail[m.id].shareExp)}
                   </div>
+                  {(detail[m.id].sent > 0 || detail[m.id].got > 0) && (
+                    <div style={{ fontSize: 12.5, color: C.purple, marginTop: 2 }}>
+                      💸 {detail[m.id].sent > 0 ? "đã chuyển " + fmt(detail[m.id].sent) : ""}
+                      {detail[m.id].sent > 0 && detail[m.id].got > 0 ? " · " : ""}
+                      {detail[m.id].got > 0 ? "đã nhận " + fmt(detail[m.id].got) : ""}
+                    </div>
+                  )}
                   <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
                     <div style={{ height: "100%", width: `${Math.min(100, (b.paid / Math.max(b.share, 1)) * 100)}%`, background: pos ? C.green : C.red, borderRadius: 99 }} />
                   </div>
