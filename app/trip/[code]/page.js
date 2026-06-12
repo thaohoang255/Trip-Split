@@ -318,7 +318,8 @@ export default function TripPage() {
       <div style={{ background: C.teal, color: "#fff", padding: "26px 20px 20px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, opacity: 0.75, fontWeight: 600 }}>CHUYẾN ĐI</div>
-          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5 }}>{trip.name}</div>
+          {/* Icon máy bay gắn ở tầng hiển thị — database vẫn lưu tên sạch */}
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5 }}>✈️ {trip.name}</div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10, flexWrap: "wrap", gap: 8 }}>
             <div style={{ fontSize: 13, opacity: 0.85 }}>
               {members.map((m) => m.name).join(" · ")} — tổng chi <b>{fmt(totalVND)}</b>
