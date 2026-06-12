@@ -367,40 +367,48 @@ export default function TripPage() {
       {/* ===== HEADER ===== */}
       <div style={{ background: C.tealDark, color: "#fff", padding: "14px 20px 20px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          {/* Logo TripSplit — bấm vào về trang chủ (quy ước chung của mọi website) */}
-          <a href="/" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, textDecoration: "none", color: "#fff", marginBottom: 18 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }}>
+          {/* Logo TripSplit ở góc trái như măng-sét báo — cả header chung MỘT trục trái */}
+          <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "#fff", marginBottom: 24, opacity: 0.9 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }}>
               <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
             </svg>
-            <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: 1.5 }}>TripSplit</span>
+            <span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: 1.5 }}>TripSplit</span>
           </a>
 
-          <div style={{ fontSize: 11, letterSpacing: 2.5, opacity: 0.75, fontWeight: 600 }}>CHUYẾN ĐI</div>
-          {/* Icon máy bay SVG: fill="currentColor" = tự ăn theo màu chữ (trắng trên nền teal) */}
-          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 10 }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
-              <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-            </svg>
-            <span>{trip.name}</span>
+          {/* Hero trục trái kiểu dàn trang tạp chí; "cuống vé" tổng chi làm đối trọng bên phải */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 18, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: 2.5, opacity: 0.75, fontWeight: 600 }}>CHUYẾN ĐI</div>
+              <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
+                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                </svg>
+                <span>{trip.name}</span>
+              </div>
+              <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6 }}>
+                {members.map((m) => m.name).join(" · ")}
+              </div>
+            </div>
+            {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết */}
+            <div style={{ borderLeft: "1.5px dashed rgba(255,255,255,.4)", paddingLeft: 16 }}>
+              <div style={{ fontSize: 10, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
+              {/* Số vàng Selective trên nền Prussian — bắt cặp với máy bay vàng của logo */}
+              <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2, color: "#FFB703" }}>{fmt(totalVND)}</div>
+            </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10, flexWrap: "wrap", gap: 8 }}>
-            <div style={{ fontSize: 13, opacity: 0.85 }}>
-              {members.map((m) => m.name).join(" · ")} — tổng chi <b>{fmt(totalVND)}</b>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={toggleSave}
-                style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-                {saved ? "✓ Đã lưu" : "☆ Lưu chuyến"}
-              </button>
-              <button onClick={copyLink}
-                style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-                {copied ? "✓ Đã copy" : "🔗 Mời bạn nhập chung"}
-              </button>
-              <button onClick={() => setShowRates(!showRates)}
-                style={{ background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer" }}>
-                Tỉ giá chốt {showRates ? "▲" : "▼"}
-              </button>
-            </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+            <button onClick={toggleSave}
+              style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+              {saved ? "✓ Đã lưu" : "☆ Lưu Trip"}
+            </button>
+            <button onClick={copyLink}
+              style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+              {copied ? "✓ Đã copy" : "🔗 Invite Link"}
+            </button>
+            <button onClick={() => setShowRates(!showRates)}
+              style={{ background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer" }}>
+              Tỉ giá {showRates ? "▲" : "▼"}
+            </button>
           </div>
 
           {showRates && (
