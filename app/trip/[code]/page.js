@@ -73,10 +73,18 @@ function parseAmount(s) {
   return parseFloat(String(s).replace(/,/g, "")) || 0;
 }
 
+// Bảng màu "Riviera": Marine - Piscine - Sable - Chili - Melon
 const C = {
-  ink: "#1B2A33", teal: "#0E7C7B", tealDark: "#0A5C5B", coral: "#FF7849",
-  sand: "#F3EDE2", paper: "#FBFAF6", line: "#E4DFD3",
-  green: "#1E8E5A", red: "#C9442A", purple: "#5B5BD6",
+  ink: "#23404F",      // chữ chính (marine đậm)
+  teal: "#2E5A70",     // Marine - màu chủ đạo, header
+  tealDark: "#1F4254", // Marine đậm (chữ nhấn, card fact)
+  coral: "#ED8B49",    // Melon - nút hành động chính
+  sand: "#F6EBC1",     // Sable nhạt - nền tag, dải trả trước
+  paper: "#FBF7EC",    // nền giấy ngả cát
+  line: "#E7DFC9",     // đường viền
+  green: "#1E8E5A",    // tiền nhận lại (giữ luật ngữ nghĩa)
+  red: "#C94F2E",      // Chili - tiền phải trả
+  purple: "#4E88A6",   // Piscine - màu của chuyển tiền
 };
 
 export default function TripPage() {
@@ -392,9 +400,9 @@ export default function TripPage() {
           <>
             <div style={{ background: "#fff", border: `1.5px solid ${editingId ? C.coral : C.line}`, borderRadius: 14, padding: 16, marginBottom: 22 }}>
               {editingId && (
-                <div style={{ background: "#FFF1EA", color: "#B45309", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ background: "#FBF1D6", color: "#946C2F", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   ✏️ Đang sửa khoản đã nhập
-                  <button onClick={cancelEdit} style={{ border: "none", background: "none", color: "#B45309", cursor: "pointer", fontSize: 12.5, textDecoration: "underline" }}>Hủy</button>
+                  <button onClick={cancelEdit} style={{ border: "none", background: "none", color: "#946C2F", cursor: "pointer", fontSize: 12.5, textDecoration: "underline" }}>Hủy</button>
                 </div>
               )}
               <div style={{ display: "flex", marginBottom: 14, borderRadius: 10, overflow: "hidden" }}>
@@ -472,7 +480,7 @@ export default function TripPage() {
               const vnd = toVND(e.amount, e.currency, rates);
               const isTransfer = e.type === "transfer";
               return (
-                <div key={e.id} style={{ background: isTransfer ? "#F4F4FB" : "#fff", border: `1.5px solid ${isTransfer ? "#DDDDF2" : C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 9, display: "flex", justifyContent: "space-between", gap: 10 }}>
+                <div key={e.id} style={{ background: isTransfer ? "#EEF5F9" : "#fff", border: `1.5px solid ${isTransfer ? "#D5E4ED" : C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 9, display: "flex", justifyContent: "space-between", gap: 10 }}>
                   <div>
                     {isTransfer ? (
                       <>
@@ -499,7 +507,7 @@ export default function TripPage() {
                       <div style={{ fontSize: 11.5, color: "#9aa6ab" }}>{Number(e.amount).toLocaleString("vi-VN")} {e.currency}</div>
                     )}
                     <div style={{ marginTop: 2 }}>
-                      <button onClick={() => startEdit(e)} style={{ border: "none", background: "none", color: "#0A5C5B", fontSize: 11.5, cursor: "pointer", fontWeight: 600 }}>Sửa</button>
+                      <button onClick={() => startEdit(e)} style={{ border: "none", background: "none", color: "#1F4254", fontSize: 11.5, cursor: "pointer", fontWeight: 600 }}>Sửa</button>
                       <span style={{ color: "#dde3e6", fontSize: 11 }}> · </span>
                       <button onClick={() => removeEntry(e.id)} style={{ border: "none", background: "none", color: "#c4ccd0", fontSize: 11.5, cursor: "pointer" }}>Xóa</button>
                     </div>
