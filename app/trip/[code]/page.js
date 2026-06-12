@@ -73,18 +73,18 @@ function parseAmount(s) {
   return parseFloat(String(s).replace(/,/g, "")) || 0;
 }
 
-// Bảng màu "Riviera": Marine - Piscine - Sable - Chili - Melon
+// Bảng màu "Biển": Sky Blue - Blue Green - Prussian Blue - Selective Yellow - UT Orange
 const C = {
-  ink: "#23404F",      // chữ chính (marine đậm)
-  teal: "#2E5A70",     // Marine - màu chủ đạo, header
-  tealDark: "#1F4254", // Marine đậm (chữ nhấn, card fact)
-  coral: "#ED8B49",    // Melon - nút hành động chính
-  sand: "#F6EBC1",     // Sable nhạt - nền tag, dải trả trước
-  paper: "#FBF7EC",    // nền giấy ngả cát
-  line: "#E7DFC9",     // đường viền
-  green: "#1E8E5A",    // tiền nhận lại (giữ luật ngữ nghĩa)
-  red: "#C94F2E",      // Chili - tiền phải trả
-  purple: "#4E88A6",   // Piscine - màu của chuyển tiền
+  ink: "#023047",      // Prussian Blue - chữ chính
+  teal: "#219EBC",     // Blue Green - màu chủ đạo (chip, viền focus)
+  tealDark: "#023047", // Prussian Blue - header, card fact đậm
+  coral: "#FB8500",    // UT Orange - nút hành động chính
+  sand: "#FFEDC2",     // Selective Yellow nhạt - tag, dải trả trước
+  paper: "#F6FBFE",    // nền giấy ngả trời
+  line: "#D9E8F1",     // đường viền xanh nhạt
+  green: "#1E8E5A",    // tiền nhận lại (luật ngữ nghĩa giữ nguyên)
+  red: "#D1453B",      // tiền phải trả
+  purple: "#126782",   // xanh biển đậm - màu của chuyển tiền
 };
 
 export default function TripPage() {
@@ -104,6 +104,8 @@ export default function TripPage() {
   const [showRates, setShowRates] = useState(false);
   const [ratesDirty, setRatesDirty] = useState(false); // tỉ giá sửa rồi nhưng chưa lưu
   const [copied, setCopied] = useState(false);
+  const [session, setSession] = useState(null); // đăng nhập hay chưa
+  const [saved, setSaved] = useState(false);    // chuyến này đã lưu vào tài khoản chưa
   const [qrView, setQrView] = useState(null); // member id đang xem QR phóng to
 
   // State thêm tiền tệ mới
@@ -134,6 +136,19 @@ export default function TripPage() {
   }, [code]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Theo dõi trạng thái đăng nhập (để hiện nút Lưu chuyến)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Đã đăng nhập thì hỏi database: chuyến này lưu vào tài khoản chưa?
+  useEffect(() => {
+    if (!session) { setSaved(false); return; }
+    supabase.rpc("is_trip_saved", { p_code: code }).then(({ data }) => setSaved(!!data));
+  }, [session, code]);
 
   // Khi danh sách thành viên về tới nơi → điền mặc định cho form
   useEffect(() => {
@@ -279,6 +294,14 @@ export default function TripPage() {
     load();
   }
 
+  // Lưu / bỏ lưu chuyến này khỏi tài khoản đang đăng nhập
+  async function toggleSave() {
+    const fn = saved ? "unsave_trip" : "save_trip_to_account";
+    const { error } = await supabase.rpc(fn, { p_code: code });
+    if (error) { alert("Thao tác lưu bị lỗi: " + error.message); return; }
+    setSaved(!saved);
+  }
+
   function copyLink() {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
@@ -323,7 +346,7 @@ export default function TripPage() {
       `}</style>
 
       {/* ===== HEADER ===== */}
-      <div style={{ background: C.teal, color: "#fff", padding: "26px 20px 20px" }}>
+      <div style={{ background: C.tealDark, color: "#fff", padding: "26px 20px 20px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, opacity: 0.75, fontWeight: 600 }}>CHUYẾN ĐI</div>
           {/* Icon máy bay SVG: fill="currentColor" = tự ăn theo màu chữ (trắng trên nền teal) */}
@@ -337,7 +360,13 @@ export default function TripPage() {
             <div style={{ fontSize: 13, opacity: 0.85 }}>
               {members.map((m) => m.name).join(" · ")} — tổng chi <b>{fmt(totalVND)}</b>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {session && (
+                <button onClick={toggleSave}
+                  style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                  {saved ? "✓ Đã lưu" : "☆ Lưu chuyến"}
+                </button>
+              )}
               <button onClick={copyLink}
                 style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
                 {copied ? "✓ Đã copy" : "🔗 Mời bạn nhập chung"}
@@ -400,7 +429,7 @@ export default function TripPage() {
           <>
             <div style={{ background: "#fff", border: `1.5px solid ${editingId ? C.coral : C.line}`, borderRadius: 14, padding: 16, marginBottom: 22 }}>
               {editingId && (
-                <div style={{ background: "#FBF1D6", color: "#946C2F", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ background: "#FFF3D6", color: "#946C2F", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   ✏️ Đang sửa khoản đã nhập
                   <button onClick={cancelEdit} style={{ border: "none", background: "none", color: "#946C2F", cursor: "pointer", fontSize: 12.5, textDecoration: "underline" }}>Hủy</button>
                 </div>
@@ -480,7 +509,7 @@ export default function TripPage() {
               const vnd = toVND(e.amount, e.currency, rates);
               const isTransfer = e.type === "transfer";
               return (
-                <div key={e.id} style={{ background: isTransfer ? "#EEF5F9" : "#fff", border: `1.5px solid ${isTransfer ? "#D5E4ED" : C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 9, display: "flex", justifyContent: "space-between", gap: 10 }}>
+                <div key={e.id} style={{ background: isTransfer ? "#E8F4F9" : "#fff", border: `1.5px solid ${isTransfer ? "#C9E2EE" : C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 9, display: "flex", justifyContent: "space-between", gap: 10 }}>
                   <div>
                     {isTransfer ? (
                       <>
@@ -507,7 +536,7 @@ export default function TripPage() {
                       <div style={{ fontSize: 11.5, color: "#9aa6ab" }}>{Number(e.amount).toLocaleString("vi-VN")} {e.currency}</div>
                     )}
                     <div style={{ marginTop: 2 }}>
-                      <button onClick={() => startEdit(e)} style={{ border: "none", background: "none", color: "#1F4254", fontSize: 11.5, cursor: "pointer", fontWeight: 600 }}>Sửa</button>
+                      <button onClick={() => startEdit(e)} style={{ border: "none", background: "none", color: "#023047", fontSize: 11.5, cursor: "pointer", fontWeight: 600 }}>Sửa</button>
                       <span style={{ color: "#dde3e6", fontSize: 11 }}> · </span>
                       <button onClick={() => removeEntry(e.id)} style={{ border: "none", background: "none", color: "#c4ccd0", fontSize: 11.5, cursor: "pointer" }}>Xóa</button>
                     </div>
@@ -541,8 +570,8 @@ export default function TripPage() {
                   <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>
                     Đã ứng/chuyển {fmt(b.paid)} · phần phải chịu {fmt(b.share)}
                   </div>
-                  <div style={{ height: 6, background: C.sand, borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, (b.paid / Math.max(b.share, 1)) * 100)}%`, background: pos ? C.green : C.coral, borderRadius: 99 }} />
+                  <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, (b.paid / Math.max(b.share, 1)) * 100)}%`, background: pos ? C.green : C.red, borderRadius: 99 }} />
                   </div>
                   {/* QR nhận tiền */}
                   <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
@@ -616,12 +645,12 @@ export default function TripPage() {
                 <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3 }}>{topSpender?.name || "—"}</div>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>{topSpender ? "ứng trước " + fmt(paidReal[topSpender.id]) : ""}</div>
               </div>
-              <div style={{ background: C.sand, color: "#6d5a25", borderRadius: 12, padding: 14 }}>
+              <div style={{ background: "#FFB703", color: "#6B4D00", borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Khoản chi khủng nhất 💸</div>
                 <div style={{ fontWeight: 800, fontSize: 14.5, marginTop: 3, color: C.ink }}>{biggestExpense?.name || "—"}</div>
                 <div style={{ fontSize: 12 }}>{biggestExpense ? fmt(toVND(biggestExpense.amount, biggestExpense.currency, rates)) : ""}</div>
               </div>
-              <div style={{ background: "#E7F0F6", color: "#3D718E", borderRadius: 12, padding: 14 }}>
+              <div style={{ background: "#8ECAE6", color: "#0F5570", borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Chi trung bình mỗi người</div>
                 <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3, color: C.ink }}>{members.length > 0 ? fmt(totalVND / members.length) : "—"}</div>
               </div>
