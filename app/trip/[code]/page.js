@@ -365,8 +365,16 @@ export default function TripPage() {
       `}</style>
 
       {/* ===== HEADER ===== */}
-      <div style={{ background: C.tealDark, color: "#fff", padding: "26px 20px 20px" }}>
+      <div style={{ background: C.tealDark, color: "#fff", padding: "14px 20px 20px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
+          {/* Logo TripSplit — bấm vào về trang chủ (quy ước chung của mọi website) */}
+          <a href="/" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, textDecoration: "none", color: "#fff", marginBottom: 18 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }}>
+              <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+            </svg>
+            <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: 1.5 }}>TripSplit</span>
+          </a>
+
           <div style={{ fontSize: 11, letterSpacing: 2.5, opacity: 0.75, fontWeight: 600 }}>CHUYẾN ĐI</div>
           {/* Icon máy bay SVG: fill="currentColor" = tự ăn theo màu chữ (trắng trên nền teal) */}
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 10 }}>
