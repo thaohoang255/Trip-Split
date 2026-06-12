@@ -28,7 +28,6 @@ export default function HomePage() {
   // ---- Admin ----
   const [session, setSession] = useState(null);
   const [myTrips, setMyTrips] = useState(null); // null = chưa tải, [] = không có/không phải admin
-  const [myName, setMyName] = useState("");     // "tên của tôi" trong các chuyến — để in đậm trong danh sách
   const [myTripIds, setMyTripIds] = useState([]); // id các chuyến đã bookmark hoặc từng nhập giao dịch
 
   // Theo dõi trạng thái đăng nhập (tự cập nhật khi login/logout xong)
@@ -38,10 +37,6 @@ export default function HomePage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Đọc "tên của tôi" từ hồ sơ tài khoản (lưu trong user_metadata của Supabase Auth)
-  useEffect(() => {
-    setMyName(session?.user?.user_metadata?.tripsplit_name || "");
-  }, [session]);
 
   // Đăng nhập rồi thì thử tải danh sách chuyến — RLS chỉ cho admin thấy dữ liệu
   useEffect(() => {
@@ -102,15 +97,7 @@ export default function HomePage() {
             </div>
             {t.members?.length > 0 && (
               <div style={{ fontSize: 12, color: "#7d8a90", marginTop: 3, paddingLeft: 23 }}>
-                {t.members.map((m, i) => {
-                  const mine = myName && m.name.trim().toLowerCase() === myName.trim().toLowerCase();
-                  return (
-                    <span key={i}>
-                      {i > 0 && " · "}
-                      {mine ? <b style={{ color: "#219EBC" }}>{m.name}</b> : m.name}
-                    </span>
-                  );
-                })}
+                {t.members.map((m) => m.name).join(" · ")}
               </div>
             )}
           </div>
@@ -129,14 +116,6 @@ export default function HomePage() {
     });
   }
 
-  // Đặt/đổi "tên của tôi" — lưu thẳng vào hồ sơ tài khoản, không cần bảng mới
-  async function changeMyName() {
-    const name = prompt("Tên m hay dùng trong các chuyến đi (vd: Thảo):", myName);
-    if (name === null) return; // bấm Cancel thì thôi
-    const { error } = await supabase.auth.updateUser({ data: { tripsplit_name: name.trim() } });
-    if (error) { alert("Lưu tên bị lỗi: " + error.message); return; }
-    setMyName(name.trim());
-  }
 
   return (
     <div style={{ minHeight: "100vh", background: C.paper }}>
@@ -219,22 +198,12 @@ export default function HomePage() {
             </div>
           ) : (
             <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 16, padding: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>Chuyến đi của tôi</div>
                 <button
                   onClick={() => supabase.auth.signOut()}
                   style={{ border: "none", background: "none", color: "#9aa6ab", fontSize: 12.5, cursor: "pointer" }}
                 >Đăng xuất</button>
-              </div>
-
-              {/* Tên hay dùng: chuyến nào có tên này sẽ được in đậm trong danh sách */}
-              <div style={{ fontSize: 12.5, color: "#7d8a90", marginBottom: 12 }}>
-                Tên của m trong các chuyến:{" "}
-                {myName ? <b style={{ color: "#219EBC" }}>{myName}</b> : <span style={{ fontStyle: "italic" }}>chưa đặt</span>}
-                <button onClick={changeMyName}
-                  style={{ border: "none", background: "none", color: "#219EBC", fontSize: 12.5, cursor: "pointer", fontWeight: 600, marginLeft: 6, textDecoration: "underline" }}>
-                  {myName ? "Đổi" : "Đặt tên"}
-                </button>
               </div>
 
               {myTrips === null && <div style={{ fontSize: 13.5, color: "#7d8a90" }}>Đang tải...</div>}
