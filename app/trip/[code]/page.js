@@ -318,8 +318,13 @@ export default function TripPage() {
       <div style={{ background: C.teal, color: "#fff", padding: "26px 20px 20px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
           <div style={{ fontSize: 11, letterSpacing: 2.5, opacity: 0.75, fontWeight: 600 }}>CHUYẾN ĐI</div>
-          {/* Icon máy bay gắn ở tầng hiển thị — database vẫn lưu tên sạch */}
-          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5 }}>✈️ {trip.name}</div>
+          {/* Icon máy bay SVG: fill="currentColor" = tự ăn theo màu chữ (trắng trên nền teal) */}
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 10 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
+              <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+            </svg>
+            <span>{trip.name}</span>
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10, flexWrap: "wrap", gap: 8 }}>
             <div style={{ fontSize: 13, opacity: 0.85 }}>
               {members.map((m) => m.name).join(" · ")} — tổng chi <b>{fmt(totalVND)}</b>
