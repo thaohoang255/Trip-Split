@@ -28,6 +28,8 @@ export default function HomePage() {
   // ---- Admin ----
   const [session, setSession] = useState(null);
   const [myTrips, setMyTrips] = useState(null); // null = chưa tải, [] = không có/không phải admin
+  const [myName, setMyName] = useState("");     // "tên của tôi" trong các chuyến — để in đậm trong danh sách
+  const [myTripIds, setMyTripIds] = useState([]); // id các chuyến đã bookmark hoặc từng nhập giao dịch
 
   // Theo dõi trạng thái đăng nhập (tự cập nhật khi login/logout xong)
   useEffect(() => {
@@ -36,14 +38,21 @@ export default function HomePage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Đọc "tên của tôi" từ hồ sơ tài khoản (lưu trong user_metadata của Supabase Auth)
+  useEffect(() => {
+    setMyName(session?.user?.user_metadata?.tripsplit_name || "");
+  }, [session]);
+
   // Đăng nhập rồi thì thử tải danh sách chuyến — RLS chỉ cho admin thấy dữ liệu
   useEffect(() => {
-    if (!session) { setMyTrips(null); return; }
+    if (!session) { setMyTrips(null); setMyTripIds([]); return; }
     supabase
       .from("trips")
       .select("id, code, name, created_at, members(name)") // members(name) = kéo kèm tên thành viên qua liên kết bảng
       .order("created_at", { ascending: false })
       .then(({ data }) => setMyTrips(data || []));
+    // Hỏi database: chuyến nào đã bookmark hoặc từng nhập giao dịch?
+    supabase.rpc("my_trip_ids").then(({ data }) => setMyTripIds(data || []));
   }, [session]);
 
   function setMemberName(i, value) {
@@ -75,11 +84,58 @@ export default function HomePage() {
     router.push(`/trip/${data.code}`); // nhảy thẳng vào trang chuyến đi vừa tạo
   }
 
+  // Chia danh sách: chuyến của tôi lên trên, chuyến khác (admin mới thấy) xuống dưới
+  const mineTrips = (myTrips || []).filter((t) => myTripIds.includes(t.id));
+  const otherTrips = (myTrips || []).filter((t) => !myTripIds.includes(t.id));
+
+  // Card chuyến đi dùng chung cho cả 2 nhóm
+  function renderTripCard(t) {
+    return (
+      <a key={t.id} href={`/trip/${t.code}`} style={{ textDecoration: "none", color: "inherit" }}>
+        <div style={{ border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14.5, display: "flex", alignItems: "center", gap: 8 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#219EBC" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
+                <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+              </svg>
+              {t.name}
+            </div>
+            {t.members?.length > 0 && (
+              <div style={{ fontSize: 12, color: "#7d8a90", marginTop: 3, paddingLeft: 23 }}>
+                {t.members.map((m, i) => {
+                  const mine = myName && m.name.trim().toLowerCase() === myName.trim().toLowerCase();
+                  return (
+                    <span key={i}>
+                      {i > 0 && " · "}
+                      {mine ? <b style={{ color: "#219EBC" }}>{m.name}</b> : m.name}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: "#9aa6ab", flexShrink: 0 }}>
+            {new Date(t.created_at).toLocaleDateString("vi-VN")}
+          </div>
+        </div>
+      </a>
+    );
+  }
+
   function loginGoogle() {
     supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
     });
+  }
+
+  // Đặt/đổi "tên của tôi" — lưu thẳng vào hồ sơ tài khoản, không cần bảng mới
+  async function changeMyName() {
+    const name = prompt("Tên m hay dùng trong các chuyến đi (vd: Thảo):", myName);
+    if (name === null) return; // bấm Cancel thì thôi
+    const { error } = await supabase.auth.updateUser({ data: { tripsplit_name: name.trim() } });
+    if (error) { alert("Lưu tên bị lỗi: " + error.message); return; }
+    setMyName(name.trim());
   }
 
   return (
@@ -163,12 +219,22 @@ export default function HomePage() {
             </div>
           ) : (
             <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 16, padding: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>Chuyến đi của tôi</div>
                 <button
                   onClick={() => supabase.auth.signOut()}
                   style={{ border: "none", background: "none", color: "#9aa6ab", fontSize: 12.5, cursor: "pointer" }}
                 >Đăng xuất</button>
+              </div>
+
+              {/* Tên hay dùng: chuyến nào có tên này sẽ được in đậm trong danh sách */}
+              <div style={{ fontSize: 12.5, color: "#7d8a90", marginBottom: 12 }}>
+                Tên của m trong các chuyến:{" "}
+                {myName ? <b style={{ color: "#219EBC" }}>{myName}</b> : <span style={{ fontStyle: "italic" }}>chưa đặt</span>}
+                <button onClick={changeMyName}
+                  style={{ border: "none", background: "none", color: "#219EBC", fontSize: 12.5, cursor: "pointer", fontWeight: 600, marginLeft: 6, textDecoration: "underline" }}>
+                  {myName ? "Đổi" : "Đặt tên"}
+                </button>
               </div>
 
               {myTrips === null && <div style={{ fontSize: 13.5, color: "#7d8a90" }}>Đang tải...</div>}
@@ -180,29 +246,18 @@ export default function HomePage() {
                 </div>
               )}
 
-              {myTrips !== null && myTrips.map((t) => (
-                <a key={t.id} href={`/trip/${t.code}`} style={{ textDecoration: "none", color: "inherit" }}>
-                  <div style={{ border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14.5, display: "flex", alignItems: "center", gap: 8 }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="#219EBC" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
-                          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                        </svg>
-                        {t.name}
-                      </div>
-                      {/* Tên người tham gia — liếc phát biết chuyến có mình hay không */}
-                      {t.members?.length > 0 && (
-                        <div style={{ fontSize: 12, color: "#7d8a90", marginTop: 3, paddingLeft: 23 }}>
-                          {t.members.map((m) => m.name).join(" · ")}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#9aa6ab", flexShrink: 0 }}>
-                      {new Date(t.created_at).toLocaleDateString("vi-VN")}
-                    </div>
-                  </div>
-                </a>
-              ))}
+              {myTrips !== null && mineTrips.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700, margin: "4px 0 8px" }}>CHUYẾN CỦA TÔI</div>
+                  {mineTrips.map(renderTripCard)}
+                </>
+              )}
+              {myTrips !== null && otherTrips.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700, margin: "14px 0 8px" }}>CHUYẾN KHÁC TRONG HỆ THỐNG</div>
+                  {otherTrips.map(renderTripCard)}
+                </>
+              )}
             </div>
           )}
         </div>
