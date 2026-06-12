@@ -10,9 +10,10 @@ import { supabase } from "../lib/supabase";
 // - Admin (đăng nhập đúng Gmail) → thấy mục "Chuyến đi của tôi"
 // ============================================================
 
+// Bảng màu "Riviera": Marine - Piscine - Sable - Chili - Melon
 const C = {
-  ink: "#1B2A33", teal: "#0E7C7B", tealDark: "#0A5C5B", coral: "#FF7849",
-  sand: "#F3EDE2", paper: "#FBFAF6", line: "#E4DFD3",
+  ink: "#23404F", teal: "#2E5A70", tealDark: "#1F4254", coral: "#ED8B49",
+  sand: "#F6EBC1", paper: "#FBF7EC", line: "#E7DFC9",
 };
 
 export default function HomePage() {
@@ -176,7 +177,7 @@ export default function HomePage() {
                 <a key={t.id} href={`/trip/${t.code}`} style={{ textDecoration: "none", color: "inherit" }}>
                   <div style={{ border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ fontWeight: 600, fontSize: 14.5, display: "flex", alignItems: "center", gap: 8 }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#0E7C7B" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#2E5A70" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
                         <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                       </svg>
                       {t.name}
