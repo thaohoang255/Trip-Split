@@ -1,0 +1,19 @@
+/* Reset tối giản — thay toàn bộ nội dung file globals.css mặc định bằng file này */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  background: #fbfaf6;
+  color: #1b2a33;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
