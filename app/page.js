@@ -175,7 +175,7 @@ export default function HomePage() {
               {myTrips !== null && myTrips.map((t) => (
                 <a key={t.id} href={`/trip/${t.code}`} style={{ textDecoration: "none", color: "inherit" }}>
                   <div style={{ border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ fontWeight: 600, fontSize: 14.5 }}>{t.name}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14.5 }}>✈️ {t.name}</div>
                     <div style={{ fontSize: 12, color: "#9aa6ab" }}>
                       {new Date(t.created_at).toLocaleDateString("vi-VN")}
                     </div>
