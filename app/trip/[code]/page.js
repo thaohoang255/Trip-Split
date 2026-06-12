@@ -609,24 +609,25 @@ export default function TripPage() {
             </div>
 
             <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, margin: "24px 0 10px" }}>FACT THÚ VỊ</div>
+            {/* Luật phân cấp: số càng quan trọng nền càng đậm. 4 card = đủ 4 màu Riviera */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
-              <div style={{ background: C.tealDark, color: "#fff", borderRadius: 12, padding: 14 }}>
+              <div style={{ background: C.coral, color: C.ink, borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.75 }}>Đại gia của chuyến đi 👑</div>
                 <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3 }}>{topSpender?.name || "—"}</div>
-                <div style={{ fontSize: 12, opacity: 0.85 }}>{topSpender ? "ứng trước " + fmt(paidReal[topSpender.id]) : ""}</div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>{topSpender ? "ứng trước " + fmt(paidReal[topSpender.id]) : ""}</div>
               </div>
-              <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 12, padding: 14 }}>
-                <div style={{ fontSize: 11, color: "#9aa6ab" }}>Khoản chi khủng nhất 💸</div>
-                <div style={{ fontWeight: 800, fontSize: 14.5, marginTop: 3 }}>{biggestExpense?.name || "—"}</div>
-                <div style={{ fontSize: 12, color: "#7d8a90" }}>{biggestExpense ? fmt(toVND(biggestExpense.amount, biggestExpense.currency, rates)) : ""}</div>
+              <div style={{ background: C.sand, color: "#6d5a25", borderRadius: 12, padding: 14 }}>
+                <div style={{ fontSize: 11, opacity: 0.85 }}>Khoản chi khủng nhất 💸</div>
+                <div style={{ fontWeight: 800, fontSize: 14.5, marginTop: 3, color: C.ink }}>{biggestExpense?.name || "—"}</div>
+                <div style={{ fontSize: 12 }}>{biggestExpense ? fmt(toVND(biggestExpense.amount, biggestExpense.currency, rates)) : ""}</div>
               </div>
-              <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 12, padding: 14 }}>
-                <div style={{ fontSize: 11, color: "#9aa6ab" }}>Chi trung bình mỗi người</div>
-                <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3 }}>{members.length > 0 ? fmt(totalVND / members.length) : "—"}</div>
+              <div style={{ background: "#E7F0F6", color: "#3D718E", borderRadius: 12, padding: 14 }}>
+                <div style={{ fontSize: 11, opacity: 0.85 }}>Chi trung bình mỗi người</div>
+                <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3, color: C.ink }}>{members.length > 0 ? fmt(totalVND / members.length) : "—"}</div>
               </div>
-              <div style={{ background: C.coral, color: "#fff", borderRadius: 12, padding: 14 }}>
+              <div style={{ background: C.tealDark, color: "#fff", borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.8 }}>Tổng "thiệt hại" cả chuyến</div>
-                <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3 }}>{fmt(totalVND)}</div>
+                <div style={{ fontWeight: 800, fontSize: 19, marginTop: 3 }}>{fmt(totalVND)}</div>
               </div>
             </div>
           </>
