@@ -1,4 +1,4 @@
-/* Reset tối giản — bảng màu Riviera */
+/* Reset tối giản — bảng màu Biển */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -7,8 +7,8 @@
 
 html,
 body {
-  background: #fbf7ec; /* nền giấy ngả cát */
-  color: #23404f;      /* chữ marine đậm */
+  background: #f6fbfe; /* nền giấy ngả trời */
+  color: #023047;      /* chữ Prussian Blue */
   font-family: "Be Vietnam Pro", system-ui, sans-serif;
 }
 

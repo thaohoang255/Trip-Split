@@ -10,10 +10,10 @@ import { supabase } from "../lib/supabase";
 // - Admin (đăng nhập đúng Gmail) → thấy mục "Chuyến đi của tôi"
 // ============================================================
 
-// Bảng màu "Riviera": Marine - Piscine - Sable - Chili - Melon
+// Bảng màu "Biển": Sky Blue - Blue Green - Prussian Blue - Selective Yellow - UT Orange
 const C = {
-  ink: "#23404F", teal: "#2E5A70", tealDark: "#1F4254", coral: "#ED8B49",
-  sand: "#F6EBC1", paper: "#FBF7EC", line: "#E7DFC9",
+  ink: "#023047", teal: "#219EBC", tealDark: "#023047", coral: "#FB8500",
+  sand: "#FFEDC2", paper: "#F6FBFE", line: "#D9E8F1",
 };
 
 export default function HomePage() {
@@ -68,6 +68,10 @@ export default function HomePage() {
       setErr("Tạo chuyến bị lỗi: " + (error?.message || "không rõ nguyên nhân"));
       return;
     }
+    // Đang đăng nhập thì tự lưu chuyến vừa tạo vào tài khoản luôn
+    if (session) {
+      await supabase.rpc("save_trip_to_account", { p_code: data.code });
+    }
     router.push(`/trip/${data.code}`); // nhảy thẳng vào trang chuyến đi vừa tạo
   }
 
@@ -81,7 +85,7 @@ export default function HomePage() {
   return (
     <div style={{ minHeight: "100vh", background: C.paper }}>
       {/* Hero */}
-      <div style={{ background: C.teal, color: "#fff", padding: "44px 20px 36px", textAlign: "center" }}>
+      <div style={{ background: C.tealDark, color: "#fff", padding: "44px 20px 36px", textAlign: "center" }}>
         <div style={{ fontSize: 12, letterSpacing: 3, opacity: 0.75, fontWeight: 600 }}>TRIPSPLIT</div>
         <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: -0.5, marginTop: 6 }}>
           Đi chơi cứ vui,<br />tiền nong để app tính
@@ -149,10 +153,13 @@ export default function HomePage() {
             <div style={{ textAlign: "center" }}>
               <button
                 onClick={loginGoogle}
-                style={{ border: `1.5px solid ${C.line}`, background: "#fff", borderRadius: 999, padding: "9px 22px", cursor: "pointer", fontSize: 13, color: "#7d8a90", fontWeight: 600 }}
+                style={{ border: `1.5px solid ${C.line}`, background: "#fff", borderRadius: 999, padding: "9px 22px", cursor: "pointer", fontSize: 13, color: C.tealDark, fontWeight: 600 }}
               >
-                Đăng nhập (dành cho chủ app)
+                Đăng nhập với Google
               </button>
+              <div style={{ fontSize: 12, color: "#9aa6ab", marginTop: 8 }}>
+                Để lưu và xem lại các chuyến đi của bạn — không bắt buộc, vào bằng link vẫn vô tư
+              </div>
             </div>
           ) : (
             <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 16, padding: 20 }}>
@@ -168,8 +175,8 @@ export default function HomePage() {
 
               {myTrips !== null && myTrips.length === 0 && (
                 <div style={{ fontSize: 13.5, color: "#7d8a90", lineHeight: 1.6 }}>
-                  Không thấy chuyến nào. Nếu m là chủ app mà thấy dòng này: kiểm tra email đang đăng nhập
-                  ({session.user?.email}) có trùng khớp với email trong bảng app_admins không (phân biệt hoa thường).
+                  Chưa có chuyến nào trong tài khoản. Tạo chuyến mới, hoặc mở một chuyến từ link bạn bè gửi
+                  rồi bấm "Lưu chuyến" trên đó — nó sẽ xuất hiện ở đây.
                 </div>
               )}
 
@@ -177,7 +184,7 @@ export default function HomePage() {
                 <a key={t.id} href={`/trip/${t.code}`} style={{ textDecoration: "none", color: "inherit" }}>
                   <div style={{ border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ fontWeight: 600, fontSize: 14.5, display: "flex", alignItems: "center", gap: 8 }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#2E5A70" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="#219EBC" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
                         <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                       </svg>
                       {t.name}
