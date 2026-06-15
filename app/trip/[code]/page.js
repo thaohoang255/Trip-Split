@@ -107,6 +107,8 @@ export default function TripPage() {
   const [session, setSession] = useState(null); // đăng nhập hay chưa
   const [saved, setSaved] = useState(false);    // chuyến này đã lưu vào tài khoản chưa
   const [qrView, setQrView] = useState(null); // member id đang xem QR phóng to
+  const [editingItin, setEditingItin] = useState(false);
+  const [itinInput, setItinInput] = useState("");
 
   // State thêm tiền tệ mới
   const [newCur, setNewCur] = useState("");
@@ -337,6 +339,13 @@ export default function TripPage() {
     setSaved(!saved);
   }
 
+  async function saveItinerary() {
+    const { error } = await supabase.rpc("set_itinerary", { p_code: code, p_url: itinInput });
+    if (error) { alert("Luu link lich trinh bi loi: " + error.message); return; }
+    setTrip({ ...trip, itinerary_url: itinInput.trim() || null });
+    setEditingItin(false);
+  }
+
   function copyLink() {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
@@ -425,7 +434,7 @@ export default function TripPage() {
             </button>
             <button onClick={copyLink}
               style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-              {copied ? "✓ Đã copy" : "🔗 Invite Link"}
+              {copied ? "✓ Đã copy" : "🔗 Shared Link"}
             </button>
             <button onClick={() => setShowRates(!showRates)}
               style={{ background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.35)", color: "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer" }}>
@@ -482,6 +491,36 @@ export default function TripPage() {
         {/* ============ TAB 1: SỔ CHI TIÊU ============ */}
         {tab === "expenses" && (
           <>
+            <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "13px 16px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 18 }}>🗺️</span>
+              {!editingItin && trip.itinerary_url && (
+                <>
+                  <a href={trip.itinerary_url} target="_blank" rel="noopener noreferrer"
+                    style={{ flex: 1, minWidth: 120, color: C.tealDark, fontWeight: 600, fontSize: 14, textDecoration: "none" }}>
+                    Xem lịch trình chuyến đi →
+                  </a>
+                  <button onClick={() => { setItinInput(trip.itinerary_url); setEditingItin(true); }}
+                    style={{ border: "none", background: "none", color: "#9aa6ab", fontSize: 12.5, cursor: "pointer" }}>Sửa link</button>
+                </>
+              )}
+              {!editingItin && !trip.itinerary_url && (
+                <button onClick={() => { setItinInput(""); setEditingItin(true); }}
+                  style={{ border: "none", background: "none", color: C.tealDark, fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>
+                  ＋ Gắn link lịch trình (Google Sheet, Docs...)
+                </button>
+              )}
+              {editingItin && (
+                <>
+                  <input className="inp" placeholder="Dán link lịch trình vào đây" value={itinInput}
+                    onChange={(e) => setItinInput(e.target.value)} style={{ flex: 1, minWidth: 140 }} />
+                  <button onClick={saveItinerary}
+                    style={{ background: C.coral, color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>Lưu</button>
+                  <button onClick={() => setEditingItin(false)}
+                    style={{ border: "none", background: "none", color: "#9aa6ab", fontSize: 12.5, cursor: "pointer" }}>Hủy</button>
+                </>
+              )}
+            </div>
+
             <div style={{ background: "#fff", border: `1.5px solid ${editingId ? C.coral : C.line}`, borderRadius: 14, padding: 16, marginBottom: 22 }}>
               {editingId && (
                 <div style={{ background: "#FFF3D6", color: "#946C2F", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
