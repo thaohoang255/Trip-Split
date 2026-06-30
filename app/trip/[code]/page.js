@@ -82,9 +82,9 @@ const C = {
   sand: "#FFEDC2",     // Selective Yellow nhạt - tag, dải trả trước
   paper: "#F6FBFE",    // nền giấy ngả trời
   line: "#D9E8F1",     // đường viền xanh nhạt
-  green: "#1E8E5A",    // tiền nhận lại (luật ngữ nghĩa giữ nguyên)
-  red: "#D1453B",      // tiền phải trả
-  purple: "#126782",   // xanh biển đậm - màu của chuyển tiền
+  green: "#219EBC",    // Blue Green - tiền NHẬN LẠI
+  red: "#FB8500",      // UT Orange - tiền PHẢI TRẢ
+  purple: "#023047",   // Prussian - màu của chuyển tiền (tách khỏi xanh nhận lại)
 };
 
 export default function TripPage() {
@@ -450,7 +450,7 @@ export default function TripPage() {
                     1 {cur} =
                     <input type="number" value={rates[cur]}
                       onChange={(e) => { setRates({ ...rates, [cur]: parseFloat(e.target.value) || 0 }); setRatesDirty(true); }}
-                      style={{ width: 90, margin: "0 6px", padding: "4px 8px", borderRadius: 8, border: "none", color: "#1B2A33", background: "#fff" }} />
+                      style={{ width: 90, margin: "0 6px", padding: "4px 8px", borderRadius: 8, border: "none", color: "#023047", background: "#fff" }} />
                     ₫
                   </label>
                 ))}
@@ -463,15 +463,15 @@ export default function TripPage() {
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <input placeholder="Mã (vd JPY)" value={newCur} onChange={(e) => setNewCur(e.target.value)}
-                  style={{ width: 100, padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 13, color: "#1B2A33", background: "#fff" }} />
+                  style={{ width: 100, padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 13, color: "#023047", background: "#fff" }} />
                 <input type="number" placeholder="Tỉ giá ra VND" value={newRate} onChange={(e) => setNewRate(e.target.value)}
-                  style={{ width: 120, padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 13, color: "#1B2A33", background: "#fff" }} />
+                  style={{ width: 120, padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 13, color: "#023047", background: "#fff" }} />
                 <button onClick={addCurrency}
                   style={{ background: C.coral, color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
                   ＋ Thêm tiền tệ
                 </button>
               </div>
-              {curError && <div style={{ fontSize: 12, color: "#FFD9CC", marginTop: 8 }}>⚠ {curError}</div>}
+              {curError && <div style={{ fontSize: 12, color: "#FFEDC2", marginTop: 8 }}>⚠ {curError}</div>}
               <div style={{ fontSize: 12, opacity: 0.8, marginTop: 10 }}>
                 Tỉ giá chốt 1 lần cho cả chuyến — đổi xong nhớ bấm Lưu để cả nhóm cùng thấy.
               </div>
@@ -523,9 +523,9 @@ export default function TripPage() {
 
             <div style={{ background: "#fff", border: `1.5px solid ${editingId ? C.coral : C.line}`, borderRadius: 14, padding: 16, marginBottom: 22 }}>
               {editingId && (
-                <div style={{ background: "#FFF3D6", color: "#946C2F", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ background: "#FFF3D6", color: "#6B4D00", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   ✏️ Đang sửa khoản đã nhập
-                  <button onClick={cancelEdit} style={{ border: "none", background: "none", color: "#946C2F", cursor: "pointer", fontSize: 12.5, textDecoration: "underline" }}>Hủy</button>
+                  <button onClick={cancelEdit} style={{ border: "none", background: "none", color: "#6B4D00", cursor: "pointer", fontSize: 12.5, textDecoration: "underline" }}>Hủy</button>
                 </div>
               )}
               <div style={{ display: "flex", marginBottom: 14, borderRadius: 10, overflow: "hidden" }}>
@@ -616,7 +616,7 @@ export default function TripPage() {
                       <>
                         <div style={{ fontWeight: 600, fontSize: 14.5 }}>
                           {e.name}
-                          {e.prepaid && <span style={{ marginLeft: 8, fontSize: 10.5, background: C.sand, color: "#8a6d3b", padding: "2px 8px", borderRadius: 999, fontWeight: 700 }}>TRẢ TRƯỚC</span>}
+                          {e.prepaid && <span style={{ marginLeft: 8, fontSize: 10.5, background: C.sand, color: "#6B4D00", padding: "2px 8px", borderRadius: 999, fontWeight: 700 }}>TRẢ TRƯỚC</span>}
                         </div>
                         <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>
                           <b style={{ color: C.tealDark }}>{nameOf(e.payer_id)}</b> trả · chia {e.participant_ids.length === members.length ? "cả nhóm" : e.participant_ids.map(nameOf).join(", ")}
@@ -725,10 +725,10 @@ export default function TripPage() {
             {prepaidList.length > 0 && (
               <div style={{ background: C.sand, borderRadius: 12, padding: "12px 14px", marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#8a6d3b" }}>Phát sinh trước chuyến đi</div>
-                  <div style={{ fontSize: 12, color: "#a08a5f" }}>{prepaidList.length} khoản đặt cọc / mua trước · chiếm {Math.round((prepaidTotal / Math.max(totalVND, 1)) * 100)}% tổng chi</div>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#6B4D00" }}>Phát sinh trước chuyến đi</div>
+                  <div style={{ fontSize: 12, color: "#6B4D00" }}>{prepaidList.length} khoản đặt cọc / mua trước · chiếm {Math.round((prepaidTotal / Math.max(totalVND, 1)) * 100)}% tổng chi</div>
                 </div>
-                <div style={{ fontWeight: 800, fontSize: 16, color: "#8a6d3b" }}>{fmt(prepaidTotal)}</div>
+                <div style={{ fontWeight: 800, fontSize: 16, color: "#6B4D00" }}>{fmt(prepaidTotal)}</div>
               </div>
             )}
 
@@ -774,7 +774,7 @@ export default function TripPage() {
                 <div style={{ fontWeight: 800, fontSize: 14.5, marginTop: 3, color: C.ink }}>{biggestExpense?.name || "—"}</div>
                 <div style={{ fontSize: 12 }}>{biggestExpense ? fmt(toVND(biggestExpense.amount, biggestExpense.currency, rates)) : ""}</div>
               </div>
-              <div style={{ background: "#8ECAE6", color: "#0F5570", borderRadius: 12, padding: 14 }}>
+              <div style={{ background: "#8ECAE6", color: "#023047", borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Chi trung bình mỗi người</div>
                 <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3, color: C.ink }}>{members.length > 0 ? fmt(totalVND / members.length) : "—"}</div>
               </div>
@@ -795,7 +795,7 @@ export default function TripPage() {
             <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 12 }}>Chuyển tiền cho {nameOf(qrView)} 💸</div>
             <img src={memberOf(qrView).qr_url} alt={`QR của ${nameOf(qrView)}`} style={{ width: "100%", borderRadius: 10 }} />
             <button onClick={() => setQrView(null)}
-              style={{ marginTop: 14, width: "100%", padding: 10, background: "#1B2A33", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+              style={{ marginTop: 14, width: "100%", padding: 10, background: "#023047", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
               Đóng
             </button>
           </div>
