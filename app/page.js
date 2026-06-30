@@ -166,12 +166,12 @@ export default function HomePage() {
             style={{ border: `1.5px dashed ${C.line}`, background: "transparent", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: 13.5, color: C.tealDark, fontWeight: 600, marginBottom: 16, width: "100%" }}
           >＋ Thêm thành viên</button>
 
-          {err && <div style={{ fontSize: 13, color: "#C9442A", marginBottom: 12 }}>⚠ {err}</div>}
+          {err && <div style={{ fontSize: 13, color: "#FB8500", marginBottom: 12 }}>⚠ {err}</div>}
 
           <button
             onClick={createTrip}
             disabled={creating}
-            style={{ width: "100%", padding: 13, background: creating ? "#f0a583" : C.coral, color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: creating ? "wait" : "pointer" }}
+            style={{ width: "100%", padding: 13, background: creating ? "#FB8500" : C.coral, color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: creating ? "wait" : "pointer" }}
           >
             {creating ? "Đang tạo chuyến..." : "Tạo chuyến & lấy link share"}
           </button>
