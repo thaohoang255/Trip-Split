@@ -644,6 +644,29 @@ export default function TripPage() {
         {/* ============ TAB 2: TỔNG KẾT ============ */}
         {tab === "summary" && (
           <>
+            {/* Chi phí thật mỗi người gánh cho chuyến (shareExp) — xếp cao xuống thấp */}
+            <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, marginBottom: 10 }}>CHI PHÍ MỖI NGƯỜI</div>
+            <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "14px 16px", marginBottom: 22 }}>
+              {[...members].sort((a, b) => detail[b.id].shareExp - detail[a.id].shareExp).map((m) => {
+                const cost = detail[m.id].shareExp;
+                const maxCost = Math.max(...members.map((x) => detail[x.id].shareExp), 1);
+                return (
+                  <div key={m.id} style={{ marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600 }}>{m.name}</span>
+                      <span style={{ fontWeight: 700 }}>{fmt(cost)}</span>
+                    </div>
+                    <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${(cost / maxCost) * 100}%`, background: C.teal, borderRadius: 99 }} />
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 4 }}>
+                Chi phí thật mỗi người phải gánh cho chuyến (không tính ai trả hộ ai)
+              </div>
+            </div>
+
             <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, marginBottom: 10 }}>SỐ DƯ TỪNG NGƯỜI</div>
             {members.map((m) => {
               const b = balances[m.id];
