@@ -87,7 +87,7 @@ export default function HomePage() {
   function renderTripCard(t) {
     return (
       <a key={t.id} href={`/trip/${t.code}`} style={{ textDecoration: "none", color: "inherit" }}>
-        <div style={{ border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 14.5, display: "flex", alignItems: "center", gap: 8 }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="#219EBC" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
@@ -133,14 +133,14 @@ export default function HomePage() {
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "26px 16px 60px" }}>
 
         {/* ===== Form tạo chuyến đi ===== */}
-        <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 16, padding: 20 }}>
+        <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 16, padding: 20 }}>
           <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 14 }}>Tạo chuyến đi mới</div>
 
           <input
             placeholder="Tên chuyến đi (vd: Đà Lạt tháng 7)"
             value={tripName}
             onChange={(e) => setTripName(e.target.value)}
-            style={{ width: "100%", padding: "11px 13px", border: `1.5px solid ${C.line}`, borderRadius: 10, fontSize: 14, outline: "none", marginBottom: 14 }}
+            style={{ width: "100%", padding: "11px 13px", background: "#EDF5FA", borderRadius: 10, fontSize: 14, outline: "none", marginBottom: 14 }}
           />
 
           <div style={{ fontSize: 12.5, color: "#7d8a90", marginBottom: 8 }}>Thành viên (nhập tên, không cần tài khoản)</div>
@@ -150,12 +150,12 @@ export default function HomePage() {
                 placeholder={`Tên người ${i + 1}`}
                 value={name}
                 onChange={(e) => setMemberName(i, e.target.value)}
-                style={{ flex: 1, padding: "10px 13px", border: `1.5px solid ${C.line}`, borderRadius: 10, fontSize: 14, outline: "none" }}
+                style={{ flex: 1, padding: "10px 13px", background: "#EDF5FA", borderRadius: 10, fontSize: 14, outline: "none" }}
               />
               {memberNames.length > 2 && (
                 <button
                   onClick={() => setMemberNames((prev) => prev.filter((_, idx) => idx !== i))}
-                  style={{ border: `1.5px solid ${C.line}`, background: "#fff", borderRadius: 10, padding: "0 14px", cursor: "pointer", color: "#9aa6ab" }}
+                  style={{ background: "#EDF5FA", borderRadius: 10, padding: "0 14px", cursor: "pointer", color: "#9aa6ab" }}
                 >✕</button>
               )}
             </div>
@@ -163,7 +163,7 @@ export default function HomePage() {
 
           <button
             onClick={() => setMemberNames((prev) => [...prev, ""])}
-            style={{ border: `1.5px dashed ${C.line}`, background: "transparent", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: 13.5, color: C.tealDark, fontWeight: 600, marginBottom: 16, width: "100%" }}
+            style={{ background: "#EDF5FA", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: 13.5, color: C.tealDark, fontWeight: 600, marginBottom: 16, width: "100%" }}
           >＋ Thêm thành viên</button>
 
           {err && <div style={{ fontSize: 13, color: "#FB8500", marginBottom: 12 }}>⚠ {err}</div>}
@@ -188,7 +188,7 @@ export default function HomePage() {
             <div style={{ textAlign: "center" }}>
               <button
                 onClick={loginGoogle}
-                style={{ border: `1.5px solid ${C.line}`, background: "#fff", borderRadius: 999, padding: "9px 22px", cursor: "pointer", fontSize: 13, color: C.tealDark, fontWeight: 600 }}
+                style={{ background: "#EDF5FA", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 999, padding: "9px 22px", cursor: "pointer", fontSize: 13, color: C.tealDark, fontWeight: 600 }}
               >
                 Đăng nhập với Google
               </button>
@@ -197,7 +197,7 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            <div style={{ background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 16, padding: 20 }}>
+            <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 16, padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>Chuyến đi của tôi</div>
                 <button
