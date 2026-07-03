@@ -378,14 +378,14 @@ export default function TripPage() {
       <style>{`
         .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:#EDF5FA; color:${C.ink}; cursor:pointer; font-size:13px; user-select:none; transition: all .15s; }
         .chip.on { background:${C.teal}; color:#fff; }
-        .inp { width:100%; padding:10px 12px; border-radius:10px; background:#EDF5FA; font-size:14px; outline:none; box-shadow:0 0 0 0 rgba(33,158,188,0); transition: box-shadow .15s; }
+        .inp { width:100%; padding:10px 12px; border:none; border-radius:10px; background:#EDF5FA; font-size:14px; outline:none; box-shadow:0 0 0 0 rgba(33,158,188,0); transition: box-shadow .15s; }
         .inp:focus { box-shadow:0 0 0 2px ${C.teal}; }
         .receipt { background:#fff; border-radius:14px; position:relative; box-shadow:0 1px 3px rgba(2,48,71,.08); }
         .receipt:before { content:""; position:absolute; top:-7px; left:0; right:0; height:14px;
           background:radial-gradient(circle at 8px 0px, transparent 7px, #fff 7.5px); background-size:18px 14px; }
         .tabbtn { flex:1; padding:11px 0; border:none; background:transparent; font-size:14px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; color:#7d8a90; }
         .tabbtn.on { color:${C.tealDark}; border-bottom-color:${C.coral}; }
-        .typebtn { flex:1; padding:9px 0; background:#EDF5FA; font-size:13.5px; font-weight:600; cursor:pointer; color:#7d8a90; }
+        .typebtn { flex:1; padding:9px 0; border:none; background:#EDF5FA; font-size:13.5px; font-weight:600; cursor:pointer; color:#7d8a90; }
         .typebtn.on { background:${C.ink}; color:#fff; }
         .hero { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; flex-wrap:wrap; }
         .stub { border-left:1.5px dashed rgba(255,255,255,.4); padding-left:16px; }
@@ -429,15 +429,15 @@ export default function TripPage() {
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
             <button onClick={toggleSave}
-              style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+              style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
               {saved ? "✓ Đã lưu" : "☆ Lưu Trip"}
             </button>
             <button onClick={copyLink}
-              style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+              style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
               {copied ? "✓ Đã copy" : "🔗 Shared Link"}
             </button>
             <button onClick={() => setShowRates(!showRates)}
-              style={{ background: "rgba(255,255,255,.15)", color: "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer" }}>
+              style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer" }}>
               Tỉ giá {showRates ? "▲" : "▼"}
             </button>
           </div>
@@ -748,7 +748,7 @@ export default function TripPage() {
                       <div style={{ fontWeight: 800, fontSize: 15 }}>{fmt(t.amount)}</div>
                       {memberOf(t.toId)?.qr_url && (
                         <button onClick={() => setQrView(t.toId)}
-                          style={{ background: C.teal, color: "#fff", borderRadius: 8, padding: "3px 9px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                          style={{ background: C.teal, border: "none", color: "#fff", borderRadius: 8, padding: "3px 9px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
                           QR
                         </button>
                       )}
