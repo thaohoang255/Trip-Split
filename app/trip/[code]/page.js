@@ -523,9 +523,9 @@ export default function TripPage() {
 
             <div style={{ background: editingId ? "#FFF6EC" : "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 14, padding: 16, marginBottom: 22 }}>
               {editingId && (
-                <div style={{ background: "#FFF3D6", color: "#6B4D00", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ background: "#FFF3D6", color: C.ink, borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   ✏️ Đang sửa khoản đã nhập
-                  <button onClick={cancelEdit} style={{ border: "none", background: "none", color: "#6B4D00", cursor: "pointer", fontSize: 12.5, textDecoration: "underline" }}>Hủy</button>
+                  <button onClick={cancelEdit} style={{ border: "none", background: "none", color: C.ink, cursor: "pointer", fontSize: 12.5, textDecoration: "underline" }}>Hủy</button>
                 </div>
               )}
               <div style={{ display: "flex", marginBottom: 14, borderRadius: 10, overflow: "hidden" }}>
@@ -616,7 +616,7 @@ export default function TripPage() {
                       <>
                         <div style={{ fontWeight: 600, fontSize: 14.5 }}>
                           {e.name}
-                          {e.prepaid && <span style={{ marginLeft: 8, fontSize: 10.5, background: C.sand, color: "#6B4D00", padding: "2px 8px", borderRadius: 999, fontWeight: 700 }}>TRẢ TRƯỚC</span>}
+                          {e.prepaid && <span style={{ marginLeft: 8, fontSize: 10.5, background: C.sand, color: C.ink, padding: "2px 8px", borderRadius: 999, fontWeight: 700 }}>TRẢ TRƯỚC</span>}
                         </div>
                         <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>
                           <b style={{ color: C.tealDark }}>{nameOf(e.payer_id)}</b> trả · chia {e.participant_ids.length === members.length ? "cả nhóm" : e.participant_ids.map(nameOf).join(", ")}
@@ -657,7 +657,7 @@ export default function TripPage() {
                       <span style={{ fontWeight: 700 }}>{fmt(cost)}</span>
                     </div>
                     <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${(cost / maxCost) * 100}%`, background: C.teal, borderRadius: 99 }} />
+                      <div style={{ height: "100%", width: `${(cost / maxCost) * 100}%`, background: C.ink, borderRadius: 99 }} />
                     </div>
                   </div>
                 );
@@ -725,10 +725,10 @@ export default function TripPage() {
             {prepaidList.length > 0 && (
               <div style={{ background: C.sand, borderRadius: 12, padding: "12px 14px", marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#6B4D00" }}>Phát sinh trước chuyến đi</div>
-                  <div style={{ fontSize: 12, color: "#6B4D00" }}>{prepaidList.length} khoản đặt cọc / mua trước · chiếm {Math.round((prepaidTotal / Math.max(totalVND, 1)) * 100)}% tổng chi</div>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink }}>Phát sinh trước chuyến đi</div>
+                  <div style={{ fontSize: 12, color: C.ink }}>{prepaidList.length} khoản đặt cọc / mua trước · chiếm {Math.round((prepaidTotal / Math.max(totalVND, 1)) * 100)}% tổng chi</div>
                 </div>
-                <div style={{ fontWeight: 800, fontSize: 16, color: "#6B4D00" }}>{fmt(prepaidTotal)}</div>
+                <div style={{ fontWeight: 800, fontSize: 16, color: C.ink }}>{fmt(prepaidTotal)}</div>
               </div>
             )}
 
@@ -769,7 +769,7 @@ export default function TripPage() {
                 <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3 }}>{topSpender?.name || "—"}</div>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>{topSpender ? "ứng trước " + fmt(paidReal[topSpender.id]) : ""}</div>
               </div>
-              <div style={{ background: "#FFB703", color: "#6B4D00", borderRadius: 12, padding: 14 }}>
+              <div style={{ background: "#FFB703", color: C.ink, borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Khoản chi khủng nhất 💸</div>
                 <div style={{ fontWeight: 800, fontSize: 14.5, marginTop: 3, color: C.ink }}>{biggestExpense?.name || "—"}</div>
                 <div style={{ fontSize: 12 }}>{biggestExpense ? fmt(toVND(biggestExpense.amount, biggestExpense.currency, rates)) : ""}</div>
