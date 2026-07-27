@@ -137,7 +137,9 @@ export default function TripPage() {
   const [busy, setBusy] = useState(false); // đang lưu gì đó
 
   const [tab, setTab] = useState("expenses");
-  const [showRates, setShowRates] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false); // modal Cài đặt
+  const [tripNameInput, setTripNameInput] = useState("");   // ô sửa tên chuyến trong modal
+  const [tripNameSaved, setTripNameSaved] = useState(false);
   const [ratesDirty, setRatesDirty] = useState(false); // tỉ giá sửa rồi nhưng chưa lưu
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState(null); // đăng nhập hay chưa
@@ -304,6 +306,15 @@ export default function TripPage() {
   }
 
   // Đổi tên thành viên qua hộp thoại nhập nhanh
+  // Thêm thành viên mới vào chuyến đang có (vd: có thêm bạn rủ đi sau khi đã tạo chuyến)
+  async function addMember() {
+    const name = prompt("Tên thành viên mới:");
+    if (!name || !name.trim()) return;
+    const { error } = await supabase.rpc("add_member", { p_code: code, p_name: name.trim() });
+    if (error) { alert("Thêm thành viên bị lỗi: " + error.message); return; }
+    load();
+  }
+
   async function renameMember(m) {
     const newName = prompt(`Sửa tên cho "${m.name}":`, m.name);
     if (!newName || !newName.trim() || newName.trim() === m.name) return;
@@ -319,6 +330,16 @@ export default function TripPage() {
     const { error } = await supabase.rpc("delete_entry", { p_code: code, p_entry_id: id });
     if (error) { alert("Xóa bị lỗi: " + error.message); return; }
     load();
+  }
+
+  // Đổi tên chuyến đi (trong modal Cài đặt)
+  async function saveTripName() {
+    if (!tripNameInput.trim()) return;
+    const { error } = await supabase.rpc("rename_trip", { p_code: code, p_name: tripNameInput.trim() });
+    if (error) { alert("Đổi tên chuyến bị lỗi: " + error.message); return; }
+    setTrip({ ...trip, name: tripNameInput.trim() });
+    setTripNameSaved(true);
+    setTimeout(() => setTripNameSaved(false), 1500);
   }
 
   async function saveRates(next) {
@@ -380,6 +401,11 @@ export default function TripPage() {
     if (error) { alert("Luu link lich trinh bi loi: " + error.message); return; }
     setTrip({ ...trip, itinerary_url: itinInput.trim() || null });
     setEditingItin(false);
+  }
+
+  function openSettings() {
+    setTripNameInput(trip.name);
+    setSettingsOpen(true);
   }
 
   function copyLink() {
@@ -472,47 +498,11 @@ export default function TripPage() {
               style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
               {copied ? "✓ Đã copy" : "🔗 Shared Link"}
             </button>
-            <button onClick={() => setShowRates(!showRates)}
+            <button onClick={openSettings}
               style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 999, padding: "5px 14px", fontSize: 12, cursor: "pointer" }}>
-              Tỉ giá {showRates ? "▲" : "▼"}
+              ⚙ Cài đặt
             </button>
           </div>
-
-          {showRates && (
-            <div style={{ marginTop: 12, background: "rgba(255,255,255,.12)", borderRadius: 12, padding: 14 }}>
-              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
-                {currencyList.filter((c) => c !== "VND").map((cur) => (
-                  <label key={cur} style={{ fontSize: 13 }}>
-                    1 {cur} =
-                    <input type="number" value={rates[cur]}
-                      onChange={(e) => { setRates({ ...rates, [cur]: parseFloat(e.target.value) || 0 }); setRatesDirty(true); }}
-                      style={{ width: 90, margin: "0 6px", padding: "4px 8px", borderRadius: 8, border: "none", color: "#023047", background: "#fff" }} />
-                    ₫
-                  </label>
-                ))}
-                {ratesDirty && (
-                  <button onClick={() => saveRates(rates)}
-                    style={{ background: "#fff", color: C.tealDark, border: "none", borderRadius: 8, padding: "5px 14px", fontWeight: 700, cursor: "pointer", fontSize: 12.5 }}>
-                    Lưu tỉ giá
-                  </button>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <input placeholder="Mã (vd JPY)" value={newCur} onChange={(e) => setNewCur(e.target.value)}
-                  style={{ width: 100, padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 13, color: "#023047", background: "#fff" }} />
-                <input type="number" placeholder="Tỉ giá ra VND" value={newRate} onChange={(e) => setNewRate(e.target.value)}
-                  style={{ width: 120, padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 13, color: "#023047", background: "#fff" }} />
-                <button onClick={addCurrency}
-                  style={{ background: C.coral, color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-                  ＋ Thêm tiền tệ
-                </button>
-              </div>
-              {curError && <div style={{ fontSize: 12, color: "#FFEDC2", marginTop: 8 }}>⚠ {curError}</div>}
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 10 }}>
-                Tỉ giá chốt 1 lần cho cả chuyến — đổi xong nhớ bấm Lưu để cả nhóm cùng thấy.
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -711,11 +701,7 @@ export default function TripPage() {
               return (
                 <div key={m.id} style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 14px", marginBottom: 9 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
-                      {m.name}
-                      <button onClick={() => renameMember(m)} title="Sửa tên"
-                        style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, color: "#b5bec2", padding: 0 }}>✏️</button>
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{m.name}</div>
                     <div style={{ fontWeight: 800, color: settled ? "#9aa6ab" : pos ? C.green : C.red, fontSize: 15 }}>
                       {settled ? "đã cân bằng ✓" : (pos ? "nhận lại " : "trả thêm ") + fmt(Math.abs(b.net))}
                     </div>
@@ -822,6 +808,83 @@ export default function TripPage() {
           </>
         )}
       </div>
+
+      {/* Modal Cài đặt: gộp sửa tên chuyến, quản lý thành viên, và tỉ giá vào một chỗ */}
+      {settingsOpen && (
+        <div onClick={() => setSettingsOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, cursor: "pointer", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 18, padding: 22, maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto", cursor: "default" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <div style={{ fontWeight: 800, fontSize: 18, color: C.ink }}>⚙ Cài đặt chuyến đi</div>
+              <button onClick={() => setSettingsOpen(false)}
+                style={{ border: "none", background: "none", fontSize: 20, color: "#9aa6ab", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+
+            {/* --- Tên chuyến đi --- */}
+            <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700, marginBottom: 8 }}>TÊN CHUYẾN ĐI</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+              <input className="inp" value={tripNameInput} onChange={(e) => setTripNameInput(e.target.value)} style={{ flex: 1 }} />
+              <button onClick={saveTripName}
+                style={{ background: tripNameSaved ? C.green : C.coral, color: "#fff", border: "none", borderRadius: 10, padding: "0 18px", fontWeight: 700, cursor: "pointer", fontSize: 13.5 }}>
+                {tripNameSaved ? "✓ Đã lưu" : "Lưu"}
+              </button>
+            </div>
+
+            {/* --- Thành viên --- */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700 }}>THÀNH VIÊN</div>
+              <button onClick={addMember}
+                style={{ border: "none", background: "none", color: C.teal, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                ＋ Thêm thành viên
+              </button>
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              {members.map((m) => (
+                <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0" }}>
+                  <span style={{ fontSize: 14.5 }}>{m.name}</span>
+                  <button onClick={() => renameMember(m)}
+                    style={{ border: "none", background: "none", color: "#9aa6ab", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                    Sửa tên
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* --- Tỉ giá --- */}
+            <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700, marginBottom: 8 }}>TỈ GIÁ CHỐT CHO CHUYẾN</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+              {currencyList.filter((c) => c !== "VND").map((cur) => (
+                <div key={cur} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
+                  <span style={{ width: 46, flexShrink: 0 }}>1 {cur} =</span>
+                  <input type="number" value={rates[cur]}
+                    onChange={(e) => { setRates({ ...rates, [cur]: parseFloat(e.target.value) || 0 }); setRatesDirty(true); }}
+                    className="inp" style={{ flex: 1 }} />
+                  <span>₫</span>
+                </div>
+              ))}
+              {ratesDirty && (
+                <button onClick={() => saveRates(rates)}
+                  style={{ background: C.teal, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, cursor: "pointer", fontSize: 12.5, alignSelf: "flex-start" }}>
+                  Lưu tỉ giá
+                </button>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input placeholder="Mã (vd JPY)" value={newCur} onChange={(e) => setNewCur(e.target.value)} className="inp" style={{ flex: 1, minWidth: 90 }} />
+              <input type="number" placeholder="Tỉ giá ra VND" value={newRate} onChange={(e) => setNewRate(e.target.value)} className="inp" style={{ flex: 1, minWidth: 100 }} />
+              <button onClick={addCurrency}
+                style={{ background: C.coral, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+                ＋ Thêm
+              </button>
+            </div>
+            {curError && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>⚠ {curError}</div>}
+            <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 10 }}>
+              Tỉ giá chốt 1 lần cho cả chuyến — đổi xong nhớ bấm Lưu để cả nhóm cùng thấy.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal phóng to QR */}
       {qrView && memberOf(qrView)?.qr_url && (
