@@ -200,12 +200,12 @@ export default function TripPage() {
     supabase.rpc("is_trip_saved", { p_code: code }).then(({ data }) => setSaved(!!data));
   }, [session, code]);
 
-  // Khi danh sách thành viên về tới nơi → điền mặc định cho form
+  // Khi danh sách thành viên về tới nơi → điền mặc định cho form.
+  // Chia cho ai để trống, bắt người dùng chủ động chọn từng người hoặc bấm "Cả nhóm".
   useEffect(() => {
     if (members.length > 0 && !fPayer) {
       setFPayer(members[0].id);
       setFReceiver(members[1]?.id || members[0].id);
-      setFParts(members.map((m) => m.id));
     }
   }, [members, fPayer]);
 
@@ -281,7 +281,7 @@ export default function TripPage() {
 
     setEditingId(null);
     setFName(""); setFAmount(""); setFPrepaid(false);
-    setFParts(members.map((m) => m.id));
+    setFParts([]);
     load();
   }
 
@@ -302,7 +302,7 @@ export default function TripPage() {
   function cancelEdit() {
     setEditingId(null);
     setFName(""); setFAmount(""); setFPrepaid(false);
-    setFParts(members.map((m) => m.id));
+    setFParts([]);
   }
 
   // Đổi tên thành viên qua hộp thoại nhập nhanh
@@ -587,6 +587,10 @@ export default function TripPage() {
                     ))}
                     <span className="chip" onClick={() => setFParts(allIds)}>Cả nhóm</span>
                   </div>
+
+                  {fParts.length === 0 && (
+                    <div style={{ fontSize: 12.5, color: C.red, marginBottom: 10 }}>⚠ Chọn ít nhất 1 người để chia khoản này</div>
+                  )}
 
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, marginBottom: 14, cursor: "pointer" }}>
                     <input type="checkbox" checked={fPrepaid} onChange={(e) => setFPrepaid(e.target.checked)} />
