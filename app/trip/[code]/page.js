@@ -140,6 +140,9 @@ export default function TripPage() {
   const [settingsOpen, setSettingsOpen] = useState(false); // modal Cài đặt
   const [tripNameInput, setTripNameInput] = useState("");   // ô sửa tên chuyến trong modal
   const [tripNameSaved, setTripNameSaved] = useState(false);
+  const [memberModal, setMemberModal] = useState(null); // null | { mode: "add" } | { mode: "rename", id, oldName }
+  const [memberNameInput, setMemberNameInput] = useState("");
+  const [memberBusy, setMemberBusy] = useState(false);
   const [ratesDirty, setRatesDirty] = useState(false); // tỉ giá sửa rồi nhưng chưa lưu
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState(null); // đăng nhập hay chưa
@@ -305,23 +308,32 @@ export default function TripPage() {
     setFParts([]);
   }
 
-  // Đổi tên thành viên qua hộp thoại nhập nhanh
-  // Thêm thành viên mới vào chuyến đang có (vd: có thêm bạn rủ đi sau khi đã tạo chuyến)
-  async function addMember() {
-    const name = prompt("Tên thành viên mới:");
-    if (!name || !name.trim()) return;
-    const { error } = await supabase.rpc("add_member", { p_code: code, p_name: name.trim() });
-    if (error) { alert("Thêm thành viên bị lỗi: " + error.message); return; }
-    load();
+  // Mở modal thêm thành viên mới (vd: có thêm bạn rủ đi sau khi đã tạo chuyến)
+  function openAddMember() {
+    setMemberNameInput("");
+    setMemberModal({ mode: "add" });
   }
 
-  async function renameMember(m) {
-    const newName = prompt(`Sửa tên cho "${m.name}":`, m.name);
-    if (!newName || !newName.trim() || newName.trim() === m.name) return;
-    const { error } = await supabase.rpc("rename_member", {
-      p_code: code, p_member_id: m.id, p_name: newName.trim(),
-    });
-    if (error) { alert("Đổi tên bị lỗi: " + error.message); return; }
+  // Mở modal đổi tên thành viên, có sẵn tên cũ trong ô nhập
+  function openRenameMember(m) {
+    setMemberNameInput(m.name);
+    setMemberModal({ mode: "rename", id: m.id, oldName: m.name });
+  }
+
+  // Lưu modal thêm/sửa thành viên — dùng chung cho cả 2 việc, chỉ khác hàm RPC gọi
+  async function submitMemberModal() {
+    const name = memberNameInput.trim();
+    if (!name || !memberModal) return;
+    if (memberModal.mode === "rename" && name === memberModal.oldName) { setMemberModal(null); return; }
+
+    setMemberBusy(true);
+    const { error } = memberModal.mode === "add"
+      ? await supabase.rpc("add_member", { p_code: code, p_name: name })
+      : await supabase.rpc("rename_member", { p_code: code, p_member_id: memberModal.id, p_name: name });
+    setMemberBusy(false);
+
+    if (error) { alert((memberModal.mode === "add" ? "Thêm thành viên" : "Đổi tên") + " bị lỗi: " + error.message); return; }
+    setMemberModal(null);
     load();
   }
 
@@ -585,7 +597,10 @@ export default function TripPage() {
                         {fParts.includes(m.id) ? "✓ " : ""}{m.name}
                       </span>
                     ))}
-                    <span className="chip" onClick={() => setFParts(allIds)}>Cả nhóm</span>
+                    <span className={`chip ${allIds.length > 0 && fParts.length === allIds.length ? "on" : ""}`}
+                      onClick={() => setFParts(fParts.length === allIds.length ? [] : allIds)}>
+                      {fParts.length === allIds.length && allIds.length > 0 ? "✓ " : ""}Cả nhóm
+                    </span>
                   </div>
 
                   {fParts.length === 0 && (
@@ -838,7 +853,7 @@ export default function TripPage() {
             {/* --- Thành viên --- */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700 }}>THÀNH VIÊN</div>
-              <button onClick={addMember}
+              <button onClick={openAddMember}
                 style={{ border: "none", background: "none", color: C.teal, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
                 ＋ Thêm thành viên
               </button>
@@ -847,7 +862,7 @@ export default function TripPage() {
               {members.map((m) => (
                 <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0" }}>
                   <span style={{ fontSize: 14.5 }}>{m.name}</span>
-                  <button onClick={() => renameMember(m)}
+                  <button onClick={() => openRenameMember(m)}
                     style={{ border: "none", background: "none", color: "#9aa6ab", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
                     Sửa tên
                   </button>
@@ -885,6 +900,35 @@ export default function TripPage() {
             {curError && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>⚠ {curError}</div>}
             <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 10 }}>
               Tỉ giá chốt 1 lần cho cả chuyến — đổi xong nhớ bấm Lưu để cả nhóm cùng thấy.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal thêm / sửa tên thành viên — thay cho window.prompt() xấu xí trước đây.
+          Nằm trên cả modal Cài đặt (z-index cao hơn) vì được mở từ bên trong đó. */}
+      {memberModal && (
+        <div onClick={() => setMemberModal(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, cursor: "pointer", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, padding: 20, maxWidth: 340, width: "100%", cursor: "default" }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: C.ink, marginBottom: 14 }}>
+              {memberModal.mode === "add" ? "Thêm thành viên" : `Đổi tên "${memberModal.oldName}"`}
+            </div>
+            <input className="inp" autoFocus value={memberNameInput}
+              placeholder={memberModal.mode === "add" ? "Tên thành viên mới" : "Tên mới"}
+              onChange={(e) => setMemberNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") submitMemberModal(); }}
+              style={{ marginBottom: 16 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setMemberModal(null)}
+                style={{ flex: 1, background: "#EDF5FA", border: "none", color: C.ink, borderRadius: 10, padding: "10px 0", fontWeight: 600, cursor: "pointer", fontSize: 14 }}>
+                Hủy
+              </button>
+              <button onClick={submitMemberModal} disabled={memberBusy || !memberNameInput.trim()}
+                style={{ flex: 1, background: memberBusy ? "#c4ccd0" : C.coral, border: "none", color: "#fff", borderRadius: 10, padding: "10px 0", fontWeight: 700, cursor: memberBusy ? "wait" : "pointer", fontSize: 14 }}>
+                {memberBusy ? "Đang lưu..." : "Lưu"}
+              </button>
             </div>
           </div>
         </div>
