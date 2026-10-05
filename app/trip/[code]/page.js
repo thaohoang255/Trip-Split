@@ -265,7 +265,7 @@ export default function TripPage() {
       if (fPayer === fReceiver) return;
       payload = {
         p_type: "transfer",
-        p_name: fName.trim() || "Chuyển tiền",
+        p_name: fName.trim() || "Trả nợ",
         p_payer_id: fPayer, p_amount: amount, p_currency: fCurrency,
         p_participant_ids: [fReceiver], p_prepaid: false,
       };
@@ -297,7 +297,7 @@ export default function TripPage() {
   function startEdit(e) {
     setEditingId(e.id);
     setFType(e.type);
-    setFName(e.type === "transfer" && e.name === "Chuyển tiền" ? "" : e.name);
+    setFName(e.type === "transfer" && (e.name === "Chuyển tiền" || e.name === "Trả nợ") ? "" : e.name);
     setFPayer(e.payer_id);
     if (e.type === "transfer") setFReceiver(e.participant_ids[0]);
     else setFParts(e.participant_ids);
@@ -575,7 +575,7 @@ export default function TripPage() {
                 <button className={`typebtn ${fType === "expense" ? "on" : ""}`} style={{ borderRadius: "10px 0 0 10px" }}
                   onClick={() => setFType("expense")}>🧾 Khoản chi</button>
                 <button className={`typebtn ${fType === "transfer" ? "on" : ""}`} style={{ borderRadius: "0 10px 10px 0", borderLeft: "none" }}
-                  onClick={() => setFType("transfer")}>💸 Chuyển tiền</button>
+                  onClick={() => setFType("transfer")}>💸 Trả nợ</button>
               </div>
 
               {fType === "expense" ? (
@@ -635,17 +635,21 @@ export default function TripPage() {
                       {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
-                  <input className="inp" placeholder="Ghi chú (vd: chuyển trước tiền cọc)" value={fName}
+                  <input className="inp" placeholder="Ghi chú (vd: Duyên trả lại tiền ăn tối)" value={fName}
                     onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 14 }} />
                   {fPayer === fReceiver && (
                     <div style={{ fontSize: 12.5, color: C.red, marginBottom: 10 }}>⚠ Người chuyển và người nhận phải khác nhau</div>
                   )}
+                  <div style={{ fontSize: 12, color: "#7d8a90", background: "#F3F8FB", borderRadius: 10, padding: "8px 12px", marginBottom: 14, lineHeight: 1.5 }}>
+                    Dùng khi A đưa tiền lại cho B để thanh toán nợ — khoản này <b>không tính vào chi phí</b>.
+                    Nếu A trả hộ một khoản chi cho B (vd trả tiền homestay giùm B), hãy nhập ở tab <b>Khoản chi</b>: A trả, chia cho B.
+                  </div>
                 </>
               )}
 
               <button onClick={addEntry} disabled={busy}
                 style={{ width: "100%", padding: 12, background: busy ? "#c4ccd0" : (fType === "expense" ? C.coral : C.purple), color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer" }}>
-                {busy ? "Đang lưu..." : editingId ? "Cập nhật khoản này" : (fType === "expense" ? "Lưu khoản chi" : "Ghi nhận chuyển tiền")}
+                {busy ? "Đang lưu..." : editingId ? "Cập nhật khoản này" : (fType === "expense" ? "Lưu khoản chi" : "Ghi nhận trả nợ")}
               </button>
             </div>
 
@@ -660,7 +664,7 @@ export default function TripPage() {
                         <div style={{ fontWeight: 600, fontSize: 14.5, color: C.purple }}>
                           💸 {nameOf(e.payer_id)} ──→ {nameOf(e.participant_ids[0])}
                         </div>
-                        <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>{e.name}</div>
+                        <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>{e.name === "Chuyển tiền" ? "Trả nợ" : e.name}</div>
                       </>
                     ) : (
                       <>
@@ -694,29 +698,26 @@ export default function TripPage() {
         {/* ============ TAB 2: TỔNG KẾT ============ */}
         {tab === "summary" && (
           <>
-            {/* Tiền THỰC TẾ mỗi người đã bỏ ra (đã tính cả tiền chuyển qua lại) — xếp cao xuống thấp */}
+            {/* Chi phí THẬT mỗi người phải chịu cho chuyến (shareExp) — ai trả hộ cũng không đổi, chuyển tiền không tính */}
             <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, marginBottom: 10 }}>CHI PHÍ MỖI NGƯỜI</div>
             <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "14px 16px", marginBottom: 22 }}>
-              {[...members].sort((a, b) => detail[b.id].outlay - detail[a.id].outlay).map((m) => {
-                const spent = detail[m.id].outlay;
-                const maxSpent = Math.max(...members.map((x) => detail[x.id].outlay), 1);
+              {[...members].sort((a, b) => detail[b.id].shareExp - detail[a.id].shareExp).map((m) => {
+                const cost = detail[m.id].shareExp;
+                const maxCost = Math.max(...members.map((x) => detail[x.id].shareExp), 1);
                 return (
                   <div key={m.id} style={{ marginBottom: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, marginBottom: 4 }}>
                       <span style={{ fontWeight: 600 }}>{m.name}</span>
-                      <span style={{ fontWeight: 700, color: spent < 0 ? C.red : C.ink }}>{spent < 0 ? "−" : ""}{fmt(Math.abs(spent))}</span>
+                      <span style={{ fontWeight: 700 }}>{fmt(cost)}</span>
                     </div>
                     <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${(Math.max(spent, 0) / maxSpent) * 100}%`, background: C.ink, borderRadius: 99 }} />
+                      <div style={{ height: "100%", width: `${(cost / maxCost) * 100}%`, background: C.ink, borderRadius: 99 }} />
                     </div>
-                    {spent < 0 && (
-                      <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 3 }}>nhận tiền chuyển nhiều hơn số đã chi</div>
-                    )}
                   </div>
                 );
               })}
               <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 4 }}>
-                Số tiền thực tế mỗi người đã bỏ ra, tính cả tiền chuyển qua lại. Cộng cả nhóm lại bằng tổng chi của chuyến.
+                Phần chi phí thật mỗi người phải chịu cho chuyến, ai trả hộ cũng không đổi.
               </div>
             </div>
 
