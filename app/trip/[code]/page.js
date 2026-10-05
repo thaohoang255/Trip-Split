@@ -233,6 +233,11 @@ export default function TripPage() {
       if (detail[e.participant_ids[0]]) detail[e.participant_ids[0]].got += vnd;
     }
   });
+  // Tiền THỰC TẾ mỗi người đã bỏ ra = trả cho chuyến + chuyển cho người khác - nhận từ người khác.
+  // Cộng cả nhóm lại luôn bằng tổng chi (vì chuyển tiền cộng trừ triệt tiêu nhau).
+  members.forEach((m) => {
+    detail[m.id].outlay = detail[m.id].paidExp + detail[m.id].sent - detail[m.id].got;
+  });
 
   const realExpenses = entries.filter((e) => e.type === "expense");
   const totalVND = realExpenses.reduce((s, e) => s + toVND(e.amount, e.currency, rates), 0);
@@ -689,26 +694,29 @@ export default function TripPage() {
         {/* ============ TAB 2: TỔNG KẾT ============ */}
         {tab === "summary" && (
           <>
-            {/* Chi phí thật mỗi người gánh cho chuyến (shareExp) — xếp cao xuống thấp */}
+            {/* Tiền THỰC TẾ mỗi người đã bỏ ra (đã tính cả tiền chuyển qua lại) — xếp cao xuống thấp */}
             <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, marginBottom: 10 }}>CHI PHÍ MỖI NGƯỜI</div>
             <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "14px 16px", marginBottom: 22 }}>
-              {[...members].sort((a, b) => detail[b.id].shareExp - detail[a.id].shareExp).map((m) => {
-                const cost = detail[m.id].shareExp;
-                const maxCost = Math.max(...members.map((x) => detail[x.id].shareExp), 1);
+              {[...members].sort((a, b) => detail[b.id].outlay - detail[a.id].outlay).map((m) => {
+                const spent = detail[m.id].outlay;
+                const maxSpent = Math.max(...members.map((x) => detail[x.id].outlay), 1);
                 return (
                   <div key={m.id} style={{ marginBottom: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, marginBottom: 4 }}>
                       <span style={{ fontWeight: 600 }}>{m.name}</span>
-                      <span style={{ fontWeight: 700 }}>{fmt(cost)}</span>
+                      <span style={{ fontWeight: 700, color: spent < 0 ? C.red : C.ink }}>{spent < 0 ? "−" : ""}{fmt(Math.abs(spent))}</span>
                     </div>
                     <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${(cost / maxCost) * 100}%`, background: C.ink, borderRadius: 99 }} />
+                      <div style={{ height: "100%", width: `${(Math.max(spent, 0) / maxSpent) * 100}%`, background: C.ink, borderRadius: 99 }} />
                     </div>
+                    {spent < 0 && (
+                      <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 3 }}>nhận tiền chuyển nhiều hơn số đã chi</div>
+                    )}
                   </div>
                 );
               })}
               <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 4 }}>
-                Chi phí thật mỗi người phải gánh cho chuyến (không tính ai trả hộ ai)
+                Số tiền thực tế mỗi người đã bỏ ra, tính cả tiền chuyển qua lại. Cộng cả nhóm lại bằng tổng chi của chuyến.
               </div>
             </div>
 
@@ -725,18 +733,12 @@ export default function TripPage() {
                       {settled ? "đã cân bằng ✓" : (pos ? "nhận lại " : "trả thêm ") + fmt(Math.abs(b.net))}
                     </div>
                   </div>
+                  {/* Tóm tắt 1 dòng: đã chi bao nhiêu trên phần chi phí của mình */}
                   <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>
-                    Ứng cho chuyến {fmt(detail[m.id].paidExp)} · phần phải chịu {fmt(detail[m.id].shareExp)}
+                    Đã chi {fmt(detail[m.id].outlay)} trên phần chi phí {fmt(detail[m.id].shareExp)}
                   </div>
-                  {(detail[m.id].sent > 0 || detail[m.id].got > 0) && (
-                    <div style={{ fontSize: 12.5, color: C.purple, marginTop: 2 }}>
-                      💸 {detail[m.id].sent > 0 ? "đã chuyển " + fmt(detail[m.id].sent) : ""}
-                      {detail[m.id].sent > 0 && detail[m.id].got > 0 ? " · " : ""}
-                      {detail[m.id].got > 0 ? "đã nhận " + fmt(detail[m.id].got) : ""}
-                    </div>
-                  )}
                   <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, (b.paid / Math.max(b.share, 1)) * 100)}%`, background: pos ? C.green : C.red, borderRadius: 99 }} />
+                    <div style={{ height: "100%", width: `${Math.min(100, (Math.max(detail[m.id].outlay, 0) / Math.max(detail[m.id].shareExp, 1)) * 100)}%`, background: pos ? C.green : C.red, borderRadius: 99 }} />
                   </div>
                   {/* QR nhận tiền */}
                   <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
