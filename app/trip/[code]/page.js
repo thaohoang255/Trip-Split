@@ -60,6 +60,12 @@ function fmt(n) {
   return Math.round(n).toLocaleString("vi-VN") + " ₫";
 }
 
+// Rút gọn tiền: 1350000 -> "1.350k" (làm tròn đến nghìn đồng) — dùng cho Bảng chia
+function fmtK(n) {
+  const k = Math.round(Math.abs(n) / 1000);
+  return k === 0 ? "0" : k.toLocaleString("vi-VN") + "k";
+}
+
 // Định dạng số đang gõ: 2800000 -> "2,800,000", hỗ trợ tối đa 2 số thập phân,
 // và chấp nhận CẢ dấu chấm lẫn dấu phẩy làm dấu thập phân (bàn phím số ở VN
 // thường dùng dấu phẩy, vd gõ 9,7 nghĩa là 9.7 -- bản cũ coi mọi dấu phẩy là
@@ -527,6 +533,7 @@ export default function TripPage() {
       <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", boxShadow: "0 1px 0 rgba(2,48,71,.08)", background: C.paper, position: "sticky", top: 0, zIndex: 5 }}>
         <button className={`tabbtn ${tab === "expenses" ? "on" : ""}`} onClick={() => setTab("expenses")}>Sổ chi tiêu ({entries.length})</button>
         <button className={`tabbtn ${tab === "summary" ? "on" : ""}`} onClick={() => { setTab("summary"); load(); }}>Tổng kết</button>
+        <button className={`tabbtn ${tab === "matrix" ? "on" : ""}`} onClick={() => { setTab("matrix"); load(); }}>Bảng chia</button>
       </div>
 
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "18px 16px 60px" }}>
@@ -829,6 +836,161 @@ export default function TripPage() {
             </div>
           </>
         )}
+
+        {/* ============ TAB 3: BẢNG CHIA — cả nhóm xem lại lần cuối trước khi chuyển tiền ============ */}
+        {tab === "matrix" && (() => {
+          const scrollMode = members.length > 4; // nhiều người thì cuộn ngang, cột tên khoản đứng yên
+          const newestFirst = [...entries].reverse(); // giống Sổ chi tiêu: mới nhất ở trên
+          const expRows = newestFirst.filter((e) => e.type === "expense");
+          const trfRows = newestFirst.filter((e) => e.type === "transfer");
+
+          // Bộ Biển: Blue Green = đã trả / được nhận lại, UT Orange = phải trả
+          const T = {
+            pos: "rgba(33,158,188,.20)", neg: "rgba(251,133,0,.22)",
+            pos2: "rgba(33,158,188,.10)", neg2: "rgba(251,133,0,.12)",
+            posStrong: "rgba(33,158,188,.32)", negStrong: "rgba(251,133,0,.34)",
+          };
+
+          // Số ròng của 1 người ở 1 dòng = đã trả - phải chịu
+          const netOf = (e, m) => {
+            const vnd = toVND(e.amount, e.currency, rates);
+            const share = e.participant_ids.includes(m.id) ? vnd / e.participant_ids.length : 0;
+            const paid = e.payer_id === m.id ? vnd : 0;
+            return { net: paid - share, involved: paid > 0 || share > 0 };
+          };
+          const signedK = (net) => {
+            const k = Math.round(net / 1000);
+            return k === 0 ? "0" : (k > 0 ? "+" : "−") + Math.abs(k).toLocaleString("vi-VN") + "k";
+          };
+          const bgFor = (net, level) => {
+            const k = Math.round(net / 1000);
+            if (k === 0) return "#fff";
+            const set = level === "soft" ? [T.pos2, T.neg2] : level === "strong" ? [T.posStrong, T.negStrong] : [T.pos, T.neg];
+            return k > 0 ? set[0] : set[1];
+          };
+
+          const stickyLeft = scrollMode ? { position: "sticky", left: 0, zIndex: 1 } : {};
+          const itemCell = { padding: "7px 8px", borderRadius: 6, textAlign: "left", fontSize: 12, lineHeight: 1.35, ...stickyLeft };
+          const numCell = { padding: "10px 2px", borderRadius: 6, textAlign: "center", fontSize: 12, whiteSpace: "nowrap" };
+          const subStyle = { fontSize: 11, color: "#7d8a90", fontWeight: 400 };
+          const thStyle = {
+            padding: "10px 0 6px", fontSize: 12, fontWeight: 700, color: C.ink, background: C.paper,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            ...(scrollMode ? {} : { position: "sticky", top: 40, zIndex: 4 }),
+          };
+
+          const sectionRow = (label) => (
+            <tr key={label}>
+              <td colSpan={members.length + 1}
+                style={{ background: "transparent", padding: "12px 4px 2px", textAlign: "left", fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: "#9aa6ab" }}>
+                {label}
+              </td>
+            </tr>
+          );
+
+          // Bấm vào tên khoản để sửa nếu phát hiện sai
+          const renderRow = (e) => {
+            const vnd = toVND(e.amount, e.currency, rates);
+            const isT = e.type === "transfer";
+            const defaultNote = e.name === "Chuyển tiền" || e.name === "Trả nợ";
+            return (
+              <tr key={e.id}>
+                <td onClick={() => { setTab("expenses"); startEdit(e); }}
+                  style={{ ...itemCell, background: isT ? "#E8F4F9" : "#fff", cursor: "pointer" }}>
+                  <div style={{ fontWeight: 700, color: C.ink }}>{isT ? "Trả nợ" : e.name}</div>
+                  <div style={subStyle}>
+                    {isT ? `${nameOf(e.payer_id)} → ${nameOf(e.participant_ids[0])}` : `${nameOf(e.payer_id)} trả`} · {fmtK(vnd)}
+                  </div>
+                  {isT && !defaultNote && <div style={subStyle}>{e.name}</div>}
+                  {e.currency !== "VND" && (
+                    <div style={{ ...subStyle, color: "#9aa6ab" }}>{Number(e.amount).toLocaleString("vi-VN")} {e.currency}</div>
+                  )}
+                </td>
+                {members.map((m) => {
+                  const { net, involved } = netOf(e, m);
+                  const zero = Math.round(net / 1000) === 0;
+                  return (
+                    <td key={m.id}
+                      style={{ ...numCell, background: involved ? bgFor(net, isT ? "soft" : "normal") : "#fff", color: !involved || zero ? "#9aa6ab" : C.ink, fontWeight: involved && !zero ? 700 : 400 }}>
+                      {involved ? signedK(net) : "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          };
+
+          if (entries.length === 0) {
+            return (
+              <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: 20, textAlign: "center", color: "#7d8a90", fontSize: 14 }}>
+                Chưa có khoản nào để tổng hợp.
+              </div>
+            );
+          }
+
+          return (
+            <>
+              <div style={{ fontSize: 12.5, color: "#5d6d77", background: "#F3F8FB", borderRadius: 10, padding: "10px 12px", marginBottom: 12, lineHeight: 1.5 }}>
+                Xem lại toàn bộ chi phí chuyến đi trước khi chuyển tiền: đủ khoản chưa, đúng người chia chưa, đúng số tiền chưa.
+                Thấy sai thì bấm vào tên khoản để sửa.
+              </div>
+
+              <div style={scrollMode ? { overflowX: "auto" } : undefined}>
+                <table style={{ width: "100%", minWidth: 104 + members.length * 56, tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 3 }}>
+                  <colgroup>
+                    <col style={{ width: 104 }} />
+                    {members.map((m) => <col key={m.id} />)}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, ...stickyLeft }}></th>
+                      {members.map((m) => <th key={m.id} style={thStyle}>{m.name}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expRows.length > 0 && sectionRow("KHOẢN CHI")}
+                    {expRows.map(renderRow)}
+                    {trfRows.length > 0 && sectionRow("TRẢ NỢ GIỮA CÁC THÀNH VIÊN — KHÔNG TÍNH VÀO CHI PHÍ")}
+                    {trfRows.map(renderRow)}
+                    <tr><td colSpan={members.length + 1} style={{ height: 8, padding: 0, background: "transparent" }}></td></tr>
+                    <tr>
+                      <td style={{ ...itemCell, background: "#fff" }}>
+                        <div style={{ fontWeight: 700, color: C.ink }}>Chi phí</div>
+                        <div style={subStyle}>phần phải chịu</div>
+                      </td>
+                      {members.map((m) => (
+                        <td key={m.id} style={{ ...numCell, background: "#fff", color: C.ink, fontWeight: 700 }}>{fmtK(detail[m.id].shareExp)}</td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td style={{ ...itemCell, background: "#fff" }}>
+                        <div style={{ fontWeight: 700, color: C.ink }}>Số dư</div>
+                        <div style={subStyle}>nhận lại / trả thêm</div>
+                      </td>
+                      {members.map((m) => {
+                        const net = balances[m.id].net;
+                        return (
+                          <td key={m.id} style={{ ...numCell, background: bgFor(net, "strong"), color: Math.round(net / 1000) === 0 ? "#9aa6ab" : C.ink, fontWeight: 700 }}>
+                            {signedK(net)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "#7d8a90", marginTop: 12 }}>
+                <span><i style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, marginRight: 6, background: "rgba(33,158,188,.6)" }}></i>Đã trả, được nhận lại</span>
+                <span><i style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, marginRight: 6, background: "rgba(251,133,0,.6)" }}></i>Phải trả</span>
+                <span>— Không liên quan</span>
+              </div>
+              <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 6 }}>
+                Số làm tròn đến nghìn đồng. Số chính xác xem ở tab Tổng kết.
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Modal Cài đặt: gộp sửa tên chuyến, quản lý thành viên, và tỉ giá vào một chỗ */}
