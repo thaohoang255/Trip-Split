@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
+import { ArrowRight, CaretRight, Check, Plus, Scan, Trash, X } from "@phosphor-icons/react";
 import { supabase } from "../../../lib/supabase";
+import { toVND, computeBalances, fmt } from "../../../lib/money";
 
 // ============================================================
 // TRANG CHUYẾN ĐI — /trip/[code]
@@ -11,27 +13,6 @@ import { supabase } from "../../../lib/supabase";
 // ============================================================
 
 // ---- Các hàm tính toán: bê nguyên từ bản demo, chỉ đổi từ "tên" sang "id" ----
-
-function toVND(amount, currency, rates) {
-  return Number(amount) * (rates[currency] || 1);
-}
-
-function computeBalances(entries, members, rates) {
-  const bal = {};
-  members.forEach((m) => (bal[m.id] = { paid: 0, share: 0, net: 0 }));
-
-  entries.forEach((e) => {
-    const vnd = toVND(e.amount, e.currency, rates);
-    if (bal[e.payer_id]) bal[e.payer_id].paid += vnd;
-    const perHead = vnd / e.participant_ids.length;
-    e.participant_ids.forEach((pid) => {
-      if (bal[pid]) bal[pid].share += perHead;
-    });
-  });
-
-  members.forEach((m) => (bal[m.id].net = bal[m.id].paid - bal[m.id].share));
-  return bal;
-}
 
 function settleDebts(balances, nameOf) {
   const debtors = [];
@@ -56,10 +37,6 @@ function settleDebts(balances, nameOf) {
   return transactions;
 }
 
-function fmt(n) {
-  return Math.round(n).toLocaleString("vi-VN") + " ₫";
-}
-
 // Rút gọn tiền: 1350000 -> "1.350k" (làm tròn đến nghìn đồng) — dùng cho Bảng chia
 function fmtK(n) {
   const k = Math.round(Math.abs(n) / 1000);
@@ -75,8 +52,12 @@ function fmtK(n) {
 // chắc đây có phải lúc người dùng bấm dấu thập phân hay không, thay vì đoán mò từ
 // chuỗi đã trộn sẵn dấu phẩy phân cách hàng nghìn -- đoán mò là nguyên nhân gây lỗi
 // khi gõ số lớn (vd tiếp tục gõ số sau "2,800" bị hiểu nhầm thành "2.800").
-function formatAmountInput(raw, prev, typedChar) {
+//
+// VND không có số lẻ: người Việt hay gõ dấu chấm làm phân cách hàng nghìn
+// (1.500.000), nên với VND mọi dấu . và , đều bị coi là phân cách hàng nghìn.
+function formatAmountInput(raw, prev, typedChar, allowDecimals = true) {
   const s = String(raw).replace(/[^0-9.,]/g, "");
+  if (!allowDecimals) return s.replace(/[.,]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
   // Đã đủ 2 số lẻ mà gõ thêm 1 CHỮ SỐ (không phải bấm thêm dấu thập phân) thì bỏ qua,
   // giữ nguyên giá trị cũ -- đúng yêu cầu "chỉ cho tối đa 2 số thập phân".
@@ -127,6 +108,11 @@ const C = {
   green: "#219EBC",    // Blue Green - tiền NHẬN LẠI
   red: "#FB8500",      // UT Orange - tiền PHẢI TRẢ
   purple: "#023047",   // Prussian - màu của chuyển tiền (tách khỏi xanh nhận lại)
+  // Bản đậm của màu tiền để dùng cho CHỮ (thanh và nền vẫn dùng màu tươi ở trên).
+  // Màu tươi chỉ đạt 2.5–3.1:1 trên nền trắng; các màu này đạt trên 4.5:1.
+  text2: "#56656E",      // chữ phụ, ghi chú
+  tealText: "#0B6F88",   // chữ "nhận lại"
+  orangeText: "#A84B00", // chữ "trả thêm"
 };
 
 export default function TripPage() {
@@ -149,7 +135,7 @@ export default function TripPage() {
   const [memberModal, setMemberModal] = useState(null); // null | { mode: "add" } | { mode: "rename", id, oldName }
   const [memberNameInput, setMemberNameInput] = useState("");
   const [memberBusy, setMemberBusy] = useState(false);
-  const [ratesDirty, setRatesDirty] = useState(false); // tỉ giá sửa rồi nhưng chưa lưu
+  const [ratesDraft, setRatesDraft] = useState(null); // tỉ giá đang sửa, chưa lưu (null = không sửa gì)
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState(null); // đăng nhập hay chưa
   const [saved, setSaved] = useState(false);    // chuyến này đã lưu vào tài khoản chưa
@@ -164,6 +150,7 @@ export default function TripPage() {
   const [showTips, setShowTips] = useState(false);   // thẻ "Cách dùng"
   const [toast, setToast] = useState(null);          // { text, detail, kind }
   const toastTimer = useRef(null);
+  const matrixHeadRef = useRef(null); // hàng tên dính của Bảng chia, cuộn ngang theo bảng
   const [formError, setFormError] = useState("");    // nhắc khi bấm Lưu mà còn thiếu
   const [deleteTarget, setDeleteTarget] = useState(null); // khoản đang chờ xác nhận xóa
   const [deleting, setDeleting] = useState(false);
@@ -185,19 +172,46 @@ export default function TripPage() {
   const [fParts, setFParts] = useState([]);
   const [fPrepaid, setFPrepaid] = useState(false);
   const [editingId, setEditingId] = useState(null); // id khoản đang sửa (null = đang thêm mới)
+  const [sheetOpen, setSheetOpen] = useState(false); // tấm nhập khoản trượt từ dưới lên
 
   // ---- Tải toàn bộ dữ liệu chuyến (gọi RPC get_trip_data) ----
+  const loadedOnce = useRef(false);
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc("get_trip_data", { p_code: code });
     setLoading(false);
-    if (error || !data) { setNotFound(true); return; }
+    if (error || !data) {
+      // Chỉ lần tải đầu mới là "không tìm thấy". Lần tải lại mà lỗi (mạng chập chờn)
+      // thì giữ nguyên dữ liệu đang xem và báo nhẹ, không thay cả trang.
+      if (!loadedOnce.current) setNotFound(true);
+      else {
+        if (error) console.error(error);
+        setToast({ text: "Chưa tải lại được dữ liệu mới. Kiểm tra mạng rồi thử lại.", kind: "error", detail: "" });
+        clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setToast(null), 6500);
+      }
+      return;
+    }
+    loadedOnce.current = true;
+    try {
+      const recent = JSON.parse(localStorage.getItem("tripsplit_recent") || "[]").filter((x) => x.code !== code);
+      recent.unshift({ code, at: new Date().toISOString() });
+      localStorage.setItem("tripsplit_recent", JSON.stringify(recent.slice(0, 20)));
+    } catch {}
     setTrip(data.trip);
     setMembers(data.members);
     setEntries(data.entries);
     setRates(data.trip.rates);
+    setRatesDraft(null);
   }, [code]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Quay lại app (vd đang ở Zalo rồi mở lại tab) thì tải lại, để thấy khoản bạn bè vừa nhập
+  useEffect(() => {
+    function onVisible() { if (document.visibilityState === "visible") load(); }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [load]);
 
   // Theo dõi trạng thái đăng nhập (để hiện nút Lưu chuyến)
   useEffect(() => {
@@ -224,7 +238,7 @@ export default function TripPage() {
 
   // Lần đầu danh sách thành viên về tới nơi: đọc "tôi là ai" đã nhớ trên máy,
   // điền sẵn người trả = tôi, rồi quyết định có hỏi "Bạn là ai?" và hiện thẻ cách dùng không.
-  // "Chia cho ai" vẫn để trống để người dùng chủ động chọn hoặc bấm "Cả nhóm".
+  // "Chia cho ai" được chọn sẵn cả nhóm mỗi lần mở tấm nhập (xem openAdd).
   useEffect(() => {
     if (members.length === 0 || meChecked) return;
     let stored = null;
@@ -242,6 +256,31 @@ export default function TripPage() {
     setShowTips(tipsDone !== "done");
     setMeChecked(true);
   }, [members, meChecked, code]);
+
+  // Esc đóng hộp thoại trên cùng. Hộp "Bạn là ai" cố ý không đóng bằng Esc (phải chọn hoặc bấm Để sau).
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== "Escape") return;
+      if (qrView) setQrView(null);
+      else if (deleteTarget) { if (!deleting) setDeleteTarget(null); }
+      else if (sheetOpen) closeSheet();
+      else if (loginPrompt) setLoginPrompt(false);
+      else if (memberModal) setMemberModal(null);
+      else if (settingsOpen) { setSettingsOpen(false); setRatesDraft(null); setCurError(""); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [qrView, deleteTarget, deleting, loginPrompt, memberModal, settingsOpen, sheetOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tấm nhập đang mở thì khóa cuộn trang phía sau; mở để thêm mới thì đưa con trỏ vào ô tên
+  const sheetNameRef = useRef(null);
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    if (!editingId) setTimeout(() => sheetNameRef.current?.focus(), 220);
+    return () => { document.body.style.overflow = prev; };
+  }, [sheetOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sửa form thì xóa lời nhắc cũ
   useEffect(() => { setFormError(""); }, [fName, fAmount, fParts, fPayer, fReceiver, fType]);
@@ -285,8 +324,9 @@ export default function TripPage() {
   members.forEach((m) => (paidReal[m.id] = 0));
   realExpenses.forEach((e) => { if (paidReal[e.payer_id] !== undefined) paidReal[e.payer_id] += toVND(e.amount, e.currency, rates); });
   const topSpender = members.length > 0
-    ? members.reduce((a, b) => (paidReal[a.id] > paidReal[b.id] ? a : b))
+    ? members.reduce((a, b) => (paidReal[b.id] > paidReal[a.id] ? b : a))
     : null;
+  const hasTopSpender = topSpender && paidReal[topSpender.id] > 0;
   const biggestExpense = realExpenses.length > 0
     ? realExpenses.reduce((a, b) => (toVND(a.amount, a.currency, rates) > toVND(b.amount, b.currency, rates) ? a : b))
     : null;
@@ -328,14 +368,31 @@ export default function TripPage() {
     setBusy(false);
     if (error) { failToast("Chưa lưu được khoản này. Thử lại nhé.", error); return; }
 
-    // Dòng mới nằm dưới form, thường ngoài màn hình, nên báo ngắn gọn đã lưu gì
+    // Báo ngắn gọn đã lưu gì, rồi đóng tấm nhập: dòng mới hiện ngay đầu danh sách
     const label = fType === "transfer" ? `${nameOf(fPayer)} trả nợ ${nameOf(fReceiver)}` : payload.p_name;
     showToast(`${editingId ? "Đã cập nhật" : "Đã thêm"} ${label} · ${fmt(toVND(amount, fCurrency, rates))}`);
 
     setEditingId(null);
     setFName(""); setFAmount(""); setFPrepaid(false);
     setFParts([]);
+    setSheetOpen(false);
     load();
+  }
+
+  // Nút "Thêm khoản chi": form trống, người trả = tôi, chia sẵn cho cả nhóm
+  function openAdd() {
+    setEditingId(null);
+    setFType("expense");
+    setFName(""); setFAmount(""); setFPrepaid(false);
+    setFParts(members.map((m) => m.id));
+    if (meId) setFPayer(meId);
+    setFormError("");
+    setSheetOpen(true);
+  }
+
+  function closeSheet() {
+    setSheetOpen(false);
+    cancelEdit();
   }
 
   // Bấm "Sửa" trên 1 khoản: đổ dữ liệu khoản đó ngược vào form
@@ -347,9 +404,16 @@ export default function TripPage() {
     if (e.type === "transfer") setFReceiver(e.participant_ids[0]);
     else setFParts(e.participant_ids);
     setFCurrency(e.currency);
-    setFAmount(formatAmountInput(String(e.amount)));
+    setFAmount(formatAmountInput(String(e.amount), "", null, e.currency !== "VND"));
     setFPrepaid(!!e.prepaid);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setFormError("");
+    setSheetOpen(true);
+  }
+
+  // Đổi sang VND thì làm tròn số đang nhập, vì VND không có số lẻ
+  function changeCurrency(cur) {
+    setFCurrency(cur);
+    if (cur === "VND" && fAmount) setFAmount(formatAmountInput(String(Math.round(parseAmount(fAmount))), "", null, false));
   }
 
   function cancelEdit() {
@@ -394,6 +458,7 @@ export default function TripPage() {
     const { error } = await supabase.rpc("delete_entry", { p_code: code, p_entry_id: deleteTarget.id });
     setDeleting(false);
     if (error) { failToast("Chưa xóa được. Thử lại nhé.", error); return; }
+    if (deleteTarget.id === editingId) closeSheet(); // khoản đang sửa đã bị xóa thì đóng tấm nhập
     setDeleteTarget(null);
     load();
   }
@@ -408,10 +473,19 @@ export default function TripPage() {
     setTimeout(() => setTripNameSaved(false), 1500);
   }
 
+  // Tỉ giá chỉ có hiệu lực khi đã lưu: đang gõ dở không làm nhảy số của cả nhóm
   async function saveRates(next) {
-    const { error } = await supabase.rpc("update_rates", { p_code: code, p_rates: next });
-    if (error) { failToast("Chưa lưu được tỉ giá. Thử lại nhé.", error); return; }
-    setRatesDirty(false);
+    const clean = {};
+    for (const [cur, v] of Object.entries(next)) {
+      const rate = Number(v);
+      if (!(rate > 0)) { setCurError(`Tỉ giá ${cur} phải lớn hơn 0.`); return false; }
+      clean[cur] = rate;
+    }
+    const { error } = await supabase.rpc("update_rates", { p_code: code, p_rates: clean });
+    if (error) { failToast("Chưa lưu được tỉ giá. Thử lại nhé.", error); return false; }
+    setRates(clean);
+    setCurError("");
+    return true;
   }
 
   function addCurrency() {
@@ -420,10 +494,8 @@ export default function TripPage() {
     if (!/^[A-Z]{3}$/.test(cur)) { setCurError("Mã tiền tệ phải gồm 3 chữ cái (vd: JPY, CAD, KRW)"); return; }
     if (rates[cur]) { setCurError("Tiền tệ " + cur + " đã có rồi"); return; }
     if (!rate || rate <= 0) { setCurError("Nhập tỉ giá hợp lệ (1 " + cur + " = ? đồng)"); return; }
-    const next = { ...rates, [cur]: rate };
-    setRates(next);
-    setNewCur(""); setNewRate(""); setCurError("");
-    saveRates(next); // tiền tệ mới lưu thẳng lên Supabase luôn
+    // tiền tệ mới lưu thẳng lên Supabase luôn
+    saveRates({ ...rates, [cur]: rate }).then((ok) => { if (ok) { setNewCur(""); setNewRate(""); } });
   }
 
   // ---- Upload ảnh QR lên Supabase Storage rồi gắn link vào member ----
@@ -469,6 +541,11 @@ export default function TripPage() {
     if (error) { failToast("Chưa lưu được link lịch trình. Thử lại nhé.", error); return; }
     setTrip({ ...trip, itinerary_url: itinInput.trim() || null });
     setEditingItin(false);
+  }
+
+  function closeSettings() {
+    setSettingsOpen(false);
+    setRatesDraft(null); setCurError("");
   }
 
   function openSettings() {
@@ -517,14 +594,14 @@ export default function TripPage() {
 
   // ---- Màn hình chờ / lỗi ----
   if (loading) {
-    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#7d8a90", background: C.paper }}>Đang tải chuyến đi...</div>;
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: C.text2, background: C.paper }}>Đang tải chuyến đi...</div>;
   }
   if (notFound) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.paper, padding: 20 }}>
         <div style={{ textAlign: "center", maxWidth: 360 }}>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 10 }}>Không tìm thấy chuyến đi</div>
-          <div style={{ fontSize: 13.5, color: "#7d8a90", marginTop: 8, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13.5, color: C.text2, marginTop: 8, lineHeight: 1.6 }}>
             Link có thể bị thiếu ký tự khi copy. Kiểm tra lại link trong group chat, hoặc về <a href="/" style={{ color: C.tealDark }}>trang chủ</a> tạo chuyến mới.
           </div>
         </div>
@@ -534,79 +611,77 @@ export default function TripPage() {
 
   const currencyList = Object.keys(rates);
   const allIds = members.map((m) => m.id);
+  const fieldLabel = { display: "block", fontSize: 12.5, fontWeight: 600, color: C.ink, marginBottom: 5 };
+  const sectionHead = { fontSize: 16, fontWeight: 800, color: C.ink, margin: "26px 0 10px" };
+  const settingsHead = { fontSize: 13.5, fontWeight: 700, color: C.ink, marginBottom: 8 };
 
   return (
     <div style={{ minHeight: "100vh", background: C.paper, color: C.ink }}>
       <style>{`
-        .chip { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:999px; white-space:nowrap; background:#EDF5FA; color:${C.ink}; cursor:pointer; font-size:13.5px; user-select:none; transition: all .15s; }
-        .chip.on { background:${C.teal}; color:#fff; }
+        .chip { display:inline-flex; align-items:center; gap:5px; padding:8px 14px; border:none; border-radius:999px; white-space:nowrap; background:#EDF5FA; color:${C.ink}; cursor:pointer; font:inherit; font-size:13.5px; user-select:none; transition: background-color .15s, color .15s; }
+        .chip.on { background:${C.tealText}; color:#fff; }
+        .entry { transition: box-shadow .15s, transform .1s; }
+        .entry:hover { box-shadow: 0 2px 8px rgba(2,48,71,.12) !important; }
+        .entry:active { transform: scale(.99); }
+        @media (prefers-reduced-motion: reduce) { .chip, .entry { transition: none; } .entry:active { transform: none; } }
         .inp { width:100%; padding:10px 12px; border:none; border-radius:10px; background:#EDF5FA; font-size:14px; outline:none; box-shadow:0 0 0 0 rgba(33,158,188,0); transition: box-shadow .15s; }
         .inp:focus { box-shadow:0 0 0 2px ${C.teal}; }
         .receipt { background:#fff; border-radius:14px; position:relative; box-shadow:0 1px 3px rgba(2,48,71,.08); }
         .receipt:before { content:""; position:absolute; top:-7px; left:0; right:0; height:14px;
           background:radial-gradient(circle at 8px 0px, transparent 7px, #fff 7.5px); background-size:18px 14px; }
-        .tabbtn { flex:1; padding:11px 0; border:none; background:transparent; font-size:14px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; color:#7d8a90; }
+        .tabbtn { flex:1; padding:11px 0; border:none; background:transparent; font-size:14px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; color:${C.text2}; }
         .tabbtn.on { color:${C.tealDark}; border-bottom-color:${C.coral}; }
-        .typebtn { flex:1; padding:11px 0; border:none; background:#EDF5FA; font-size:13.5px; font-weight:600; cursor:pointer; color:#7d8a90; }
+        .typebtn { flex:1; padding:11px 0; border:none; background:#EDF5FA; font-size:13.5px; font-weight:600; cursor:pointer; color:${C.text2}; }
         .typebtn.on { background:${C.ink}; color:#fff; }
-        .hero { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; flex-wrap:wrap; }
-        .stub { border-left:1.5px dashed rgba(255,255,255,.4); padding-left:16px; }
-        /* Màn hình hẹp: cuống vé chiếm trọn hàng, đường xé xoay ngang như xé ngang thân vé */
-        @media (max-width: 560px) {
-          .stub { border-left:none; border-top:1.5px dashed rgba(255,255,255,.35); padding:12px 0 0; width:100%; margin-top:2px; }
-        }
+        .sheet { animation: sheet-up .22s cubic-bezier(.16,1,.3,1); }
+        .scrim { animation: scrim-in .2s ease-out; }
+        @keyframes sheet-up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+        @keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .sheet, .scrim { animation: none; } }
       `}</style>
 
-      {/* ===== HEADER ===== */}
-      <div style={{ background: C.tealDark, color: "#fff", padding: "14px 20px 20px" }}>
+      {/* ===== HEADER =====
+          Gọn lại để danh sách khoản chi hiện ngay màn hình đầu: tên chuyến bên trái,
+          "cuống vé" tổng chi bên phải, hàng nút bên dưới. Danh sách thành viên đầy đủ nằm ở Cài đặt. */}
+      <header style={{ background: C.tealDark, color: "#fff", padding: "12px 16px 14px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          {/* Logo TripSplit ở góc trái như măng-sét báo — cả header chung MỘT trục trái */}
-          <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "#fff", marginBottom: 24, opacity: 0.9 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }}>
-              <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-            </svg>
-            <span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: 1.5 }}>TripSplit</span>
-          </a>
-
-          {/* Hero trục trái kiểu dàn trang tạp chí; "cuống vé" tổng chi làm đối trọng bên phải */}
-          <div className="hero">
-            <div>
-              <div style={{ fontSize: 11, letterSpacing: 2.5, opacity: 0.75, fontWeight: 600 }}>CHUYẾN ĐI</div>
-              <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
+            <div style={{ minWidth: 0 }}>
+              <a href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: "4px 0" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
                   <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                 </svg>
-                <span>{trip.name}</span>
-              </div>
-              <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6 }}>
-                {members.map((m, i) => (
-                  <span key={m.id}>{i > 0 && " · "}{m.id === meId ? <b>{m.name} (bạn)</b> : m.name}</span>
-                ))}
+                <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: 1.2 }}>TripSplit</span>
+              </a>
+              <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2, marginTop: 4, overflowWrap: "anywhere" }}>{trip.name}</h1>
+              <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 3 }}>
+                {members.length} người · {me
+                  ? <>bạn là <b>{me.name}</b></>
+                  : <button type="button" onClick={() => setAskWho(true)} style={{ border: "none", background: "none", color: "#fff", font: "inherit", textDecoration: "underline", cursor: "pointer", padding: 0 }}>chọn bạn là ai</button>}
               </div>
             </div>
             {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết */}
-            <div className="stub">
-              <div style={{ fontSize: 10, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
-              {/* Số vàng Selective trên nền Prussian — bắt cặp với máy bay vàng của logo */}
-              <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2, color: "#FFB703" }}>{fmt(totalVND)}</div>
+            <div style={{ borderLeft: "1.5px dashed rgba(255,255,255,.4)", paddingLeft: 12, textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
+              <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt(totalVND)}</div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
             <button onClick={toggleSave}
-              style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "10px 16px", fontSize: 13, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+              style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
               {saved ? "Đã lưu" : "Lưu chuyến"}
             </button>
             <button onClick={copyLink}
-              style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "10px 16px", fontSize: 13, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-              {copied ? "Đã copy" : "Copy link mời"}
+              style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+              {copied ? "Đã copy link" : "Mời bạn"}
             </button>
             <button onClick={openSettings}
-              style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 999, padding: "10px 16px", fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
+              style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 999, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
               Cài đặt
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* ===== TABS ===== */}
       <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", boxShadow: "0 1px 0 rgba(2,48,71,.08)", background: C.paper, position: "sticky", top: 0, zIndex: 5 }}>
@@ -615,7 +690,7 @@ export default function TripPage() {
         <button className={`tabbtn ${tab === "matrix" ? "on" : ""}`} onClick={() => { setTab("matrix"); load(); }}>Bảng chia</button>
       </div>
 
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "18px 16px 60px" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "18px 16px 110px" }}>
 
         {/* ============ TAB 1: SỔ CHI TIÊU ============ */}
         {tab === "expenses" && (
@@ -624,11 +699,11 @@ export default function TripPage() {
               <div style={{ background: "#F3F8FB", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: C.ink, marginBottom: 8 }}>Cách dùng</div>
                 {[
-                  "Chưa gửi link cho cả nhóm thì bấm Copy link mời ở trên rồi dán vào group chat.",
-                  "Ai trả tiền gì thì nhập ở khung bên dưới. Mỗi người tự nhập khoản mình đã trả.",
+                  "Chưa gửi link cho cả nhóm thì bấm Mời bạn ở trên để copy link, rồi dán vào group chat.",
+                  "Ai trả tiền gì thì bấm Thêm khoản chi ở cuối màn hình. Mỗi người tự nhập khoản mình đã trả.",
                   "Cuối chuyến, vào tab Tổng kết để xem ai chuyển cho ai. Thêm mã QR ngân hàng của bạn ở đó để người khác quét trả.",
                 ].map((t, i) => (
-                  <div key={i} style={{ display: "grid", gridTemplateColumns: "22px 1fr", fontSize: 13.5, lineHeight: 1.5, color: "#5d6d77", marginBottom: 6 }}>
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "22px 1fr", fontSize: 13.5, lineHeight: 1.5, color: C.text2, marginBottom: 6 }}>
                     <span style={{ fontWeight: 700, color: C.ink }}>{i + 1}.</span>
                     <span>{t}</span>
                   </div>
@@ -648,157 +723,74 @@ export default function TripPage() {
                     Xem lịch trình chuyến đi →
                   </a>
                   <button onClick={() => { setItinInput(trip.itinerary_url); setEditingItin(true); }}
-                    style={{ border: "none", background: "none", color: "#5d6d77", fontSize: 13.5, padding: "8px 4px", cursor: "pointer" }}>Sửa link</button>
+                    style={{ border: "none", background: "none", color: C.text2, fontSize: 13.5, padding: "8px 4px", cursor: "pointer" }}>Sửa link</button>
                 </>
               )}
               {!editingItin && !trip.itinerary_url && (
                 <button onClick={() => { setItinInput(""); setEditingItin(true); }}
                   style={{ border: "none", background: "none", color: C.tealDark, fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>
-                  ＋ Gắn link lịch trình (Google Sheet, Docs...)
+                  <Plus size={15} weight="bold" aria-hidden="true" style={{ verticalAlign: -2, marginRight: 6 }} />Gắn link lịch trình (Google Sheet, Docs...)
                 </button>
               )}
               {editingItin && (
                 <>
-                  <input className="inp" placeholder="Dán link lịch trình vào đây" value={itinInput}
+                  <input className="inp" aria-label="Link lịch trình" placeholder="Dán link lịch trình vào đây" value={itinInput}
                     onChange={(e) => setItinInput(e.target.value)} style={{ flex: 1, minWidth: 140 }} />
                   <button onClick={saveItinerary}
-                    style={{ background: C.coral, color: "#fff", border: "none", borderRadius: 10, padding: "9px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>Lưu</button>
+                    style={{ background: C.coral, color: C.ink, border: "none", borderRadius: 10, padding: "9px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>Lưu</button>
                   <button onClick={() => setEditingItin(false)}
-                    style={{ border: "none", background: "none", color: "#5d6d77", fontSize: 13.5, padding: "8px 4px", cursor: "pointer" }}>Hủy</button>
+                    style={{ border: "none", background: "none", color: C.text2, fontSize: 13.5, padding: "8px 4px", cursor: "pointer" }}>Hủy</button>
                 </>
               )}
             </div>
 
-            <div style={{ background: editingId ? "#FFF6EC" : "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 14, padding: 16, marginBottom: 22 }}>
-              {editingId && (
-                <div style={{ background: "#FFF3D6", color: C.ink, borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  Đang sửa khoản đã nhập
-                  <button onClick={cancelEdit} style={{ border: "none", background: "none", color: C.ink, cursor: "pointer", fontSize: 13.5, padding: "6px 4px", textDecoration: "underline" }}>Hủy</button>
-                </div>
-              )}
-              <div style={{ display: "flex", marginBottom: 14, borderRadius: 10, overflow: "hidden" }}>
-                <button className={`typebtn ${fType === "expense" ? "on" : ""}`} style={{ borderRadius: "10px 0 0 10px" }}
-                  onClick={() => setFType("expense")}>Khoản chi</button>
-                <button className={`typebtn ${fType === "transfer" ? "on" : ""}`} style={{ borderRadius: "0 10px 10px 0" }}
-                  onClick={() => setFType("transfer")}>Trả nợ</button>
-              </div>
-
-              {fType === "expense" ? (
-                <>
-                  <input className="inp" placeholder="Tên khoản chi (vd: Ăn trưa ngày 3)" value={fName}
-                    onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 10 }} />
-
-                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                    <input className="inp" type="text" inputMode="decimal" placeholder="Số tiền" value={fAmount}
-                      onChange={(e) => setFAmount(formatAmountInput(e.target.value, fAmount, e.nativeEvent?.data))} style={{ flex: 2 }} />
-                    <select className="inp" value={fCurrency} onChange={(e) => setFCurrency(e.target.value)} style={{ flex: 1 }}>
-                      {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <select className="inp" value={fPayer} onChange={(e) => setFPayer(e.target.value)} style={{ flex: 1.4 }}>
-                      {members.map((m) => <option key={m.id} value={m.id}>{m.name} trả</option>)}
-                    </select>
-                  </div>
-
-                  <div style={{ fontSize: 12.5, color: "#7d8a90", marginBottom: 6 }}>Chia cho ai? <span style={{ color: "#9aa6ab" }}>Chọn từng người hoặc bấm Cả nhóm</span></div>
-                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
-                    {members.map((m) => (
-                      <span key={m.id} className={`chip ${fParts.includes(m.id) ? "on" : ""}`}
-                        onClick={() => setFParts((prev) => prev.includes(m.id) ? prev.filter((p) => p !== m.id) : [...prev, m.id])}>
-                        {fParts.includes(m.id) ? "✓ " : ""}{m.name}
-                      </span>
-                    ))}
-                    <span className={`chip ${allIds.length > 0 && fParts.length === allIds.length ? "on" : ""}`}
-                      onClick={() => setFParts(fParts.length === allIds.length ? [] : allIds)}>
-                      {fParts.length === allIds.length && allIds.length > 0 ? "✓ " : ""}Cả nhóm
-                    </span>
-                  </div>
-
-                  <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13.5, marginBottom: 14, cursor: "pointer", lineHeight: 1.45 }}>
-                    <input type="checkbox" checked={fPrepaid} onChange={(e) => setFPrepaid(e.target.checked)}
-                      style={{ marginTop: 2, width: 18, height: 18, flexShrink: 0 }} />
-                    <span>
-                      Chi trước chuyến đi (đặt cọc, mua vé trước)
-                      <br /><span style={{ fontSize: 12, color: "#7d8a90" }}>Chỉ để gắn nhãn và gom riêng ở tab Tổng kết, không đổi cách chia tiền.</span>
-                    </span>
-                  </label>
-                </>
-              ) : (
-                <>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
-                    <select className="inp" value={fPayer} onChange={(e) => setFPayer(e.target.value)} style={{ flex: 1 }}>
-                      {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                    <span style={{ color: "#9aa6ab", flexShrink: 0 }}>──→</span>
-                    <select className="inp" value={fReceiver} onChange={(e) => setFReceiver(e.target.value)} style={{ flex: 1 }}>
-                      {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                    <input className="inp" type="text" inputMode="decimal" placeholder="Số tiền" value={fAmount}
-                      onChange={(e) => setFAmount(formatAmountInput(e.target.value, fAmount, e.nativeEvent?.data))} style={{ flex: 2 }} />
-                    <select className="inp" value={fCurrency} onChange={(e) => setFCurrency(e.target.value)} style={{ flex: 1 }}>
-                      {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <input className="inp" placeholder="Ghi chú (vd: Duyên trả lại tiền ăn tối)" value={fName}
-                    onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 14 }} />
-                  <div style={{ fontSize: 12, color: "#7d8a90", background: "#F3F8FB", borderRadius: 10, padding: "8px 12px", marginBottom: 14, lineHeight: 1.5 }}>
-                    Dùng khi A đưa tiền lại cho B để trả nợ. Khoản này không tính vào chi phí.
-                    Nếu A trả hộ một khoản chi cho B (vd tiền homestay), nhập ở tab Khoản chi: A trả, chia cho B.
-                  </div>
-                </>
-              )}
-
-              {formError && (
-                <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{formError}</div>
-              )}
-              <button onClick={addEntry} disabled={busy}
-                style={{ width: "100%", padding: 12, background: busy ? "#c4ccd0" : (fType === "expense" ? C.coral : C.purple), color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer" }}>
-                {busy ? "Đang lưu..." : editingId ? "Cập nhật khoản này" : (fType === "expense" ? "Lưu khoản chi" : "Ghi nhận trả nợ")}
-              </button>
-            </div>
-
+            {entries.length > 0 && (
+              <div style={{ fontSize: 12.5, color: C.text2, margin: "0 2px 8px" }}>Bấm vào một khoản để sửa hoặc xóa.</div>
+            )}
             {[...entries].reverse().map((e) => {
               const vnd = toVND(e.amount, e.currency, rates);
               const isTransfer = e.type === "transfer";
+              const isEditing = e.id === editingId;
               return (
-                <div key={e.id} style={{ background: isTransfer ? "#E8F4F9" : "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 14px", marginBottom: 9, display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <div>
+                // Cả hàng là một nút: bấm để đổ khoản này lên form sửa
+                <button type="button" key={e.id} className="btn-reset entry" onClick={() => startEdit(e)} aria-current={isEditing || undefined}
+                  aria-label={`Sửa ${isTransfer ? `${nameOf(e.payer_id)} trả nợ ${nameOf(e.participant_ids[0])}` : e.name}, ${fmt(vnd)}`}
+                  style={{ width: "100%", background: isTransfer ? "#E8F4F9" : "#fff", boxShadow: isEditing ? `0 0 0 2px ${C.coral}` : "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 12px 12px 14px", marginBottom: 9, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
                     {isTransfer ? (
                       <>
-                        <div style={{ fontWeight: 600, fontSize: 14.5, color: C.purple }}>
-                          {nameOf(e.payer_id)} ──→ {nameOf(e.participant_ids[0])}
+                        <div style={{ fontWeight: 600, fontSize: 14.5, color: C.purple, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          {nameOf(e.payer_id)} <ArrowRight size={14} weight="bold" aria-hidden="true" /> {nameOf(e.participant_ids[0])}
                         </div>
-                        <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>{e.name === "Chuyển tiền" ? "Trả nợ" : e.name}</div>
+                        <div style={{ fontSize: 12.5, color: C.text2, marginTop: 3 }}>{e.name === "Chuyển tiền" ? "Trả nợ" : e.name}</div>
                       </>
                     ) : (
                       <>
                         <div style={{ fontWeight: 600, fontSize: 14.5 }}>
                           {e.name}
-                          {e.prepaid && <span style={{ marginLeft: 8, fontSize: 11, background: C.sand, color: C.ink, padding: "2px 8px", borderRadius: 999, fontWeight: 700 }}>CHI TRƯỚC</span>}
+                          {e.prepaid && <span style={{ marginLeft: 8, fontSize: 11, background: C.sand, color: C.ink, padding: "2px 8px", borderRadius: 999, fontWeight: 700, whiteSpace: "nowrap" }}>CHI TRƯỚC</span>}
                         </div>
-                        <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>
+                        <div style={{ fontSize: 12.5, color: C.text2, marginTop: 3 }}>
                           <b style={{ color: C.tealDark }}>{nameOf(e.payer_id)}</b> trả · chia {e.participant_ids.length === members.length ? "cả nhóm" : e.participant_ids.map(nameOf).join(", ")}
                         </div>
                       </>
                     )}
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: 14.5 }}>{fmt(vnd)}</div>
-                    {e.currency !== "VND" && (
-                      <div style={{ fontSize: 11.5, color: "#9aa6ab" }}>{Number(e.amount).toLocaleString("vi-VN")} {e.currency}</div>
-                    )}
-                    <div style={{ marginTop: 4, marginRight: -10, display: "flex", justifyContent: "flex-end", gap: 4 }}>
-                      <button onClick={() => startEdit(e)} style={{ border: "none", background: "none", color: C.ink, fontSize: 13, cursor: "pointer", fontWeight: 600, padding: "8px 10px" }}>Sửa</button>
-                      <button onClick={() => setDeleteTarget(e)} style={{ border: "none", background: "none", color: "#7d8a90", fontSize: 13, cursor: "pointer", padding: "8px 10px" }}>Xóa</button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontWeight: 800, fontSize: 14.5, fontVariantNumeric: "tabular-nums" }}>{fmt(vnd)}</div>
+                      {e.currency !== "VND" && (
+                        <div style={{ fontSize: 11.5, color: C.text2 }}>{Number(e.amount).toLocaleString("vi-VN")} {e.currency}</div>
+                      )}
                     </div>
+                    <CaretRight size={16} color={C.text2} aria-hidden="true" />
                   </div>
-                </div>
+                </button>
               );
             })}
             {entries.length === 0 && (
-              <div style={{ textAlign: "center", color: "#7d8a90", fontSize: 14, padding: "8px 0" }}>
-                Chưa có khoản nào. Nhập khoản đầu tiên ở khung phía trên.
+              <div style={{ textAlign: "center", color: C.text2, fontSize: 14, padding: "8px 0" }}>
+                Chưa có khoản nào. Bấm Thêm khoản chi ở dưới để nhập khoản đầu tiên.
               </div>
             )}
           </>
@@ -807,30 +799,164 @@ export default function TripPage() {
         {/* ============ TAB 2: TỔNG KẾT ============ */}
         {tab === "summary" && (
           <>
-            {me && !me.qr_url && balances[me.id].net > 1 && (
-              <div style={{ background: "#F3F8FB", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>Bạn đang được nhận lại {fmt(balances[me.id].net)}</div>
-                <div style={{ fontSize: 13.5, color: "#5d6d77", lineHeight: 1.5, margin: "4px 0 12px" }}>
-                  Thêm mã QR ngân hàng để người trả quét là chuyển được. Mở app ngân hàng, vào mã QR nhận tiền, chụp màn hình rồi chọn ảnh đó ở đây.
+            {/* "Phần của bạn": câu trả lời cuối chuyến (chuyển cho ai, bao nhiêu) nằm ngay đầu tab */}
+            {(() => {
+              const card = { background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 14, padding: 16, display: "grid", gap: 10 };
+              const row = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#F3F8FB", borderRadius: 10, padding: "10px 12px" };
+              const bigLabel = { fontSize: 13, color: C.text2 };
+              const bigNum = (color) => ({ fontSize: 24, fontWeight: 800, color, fontVariantNumeric: "tabular-nums", lineHeight: 1.2 });
+
+              if (!me) {
+                return (
+                  <div style={card}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>Bạn là ai trong chuyến này?</div>
+                    <div style={{ fontSize: 13.5, color: C.text2, lineHeight: 1.5 }}>Chọn tên để xem bạn cần chuyển hay được nhận lại bao nhiêu.</div>
+                    <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                      {members.map((m) => (
+                        <button type="button" key={m.id} className="chip" onClick={() => chooseMe(m.id)}>{m.name}</button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
+              const outgoing = transactions.filter((t) => t.fromId === me.id);
+              const incoming = transactions.filter((t) => t.toId === me.id);
+              const sum = (list) => list.reduce((a, t) => a + t.amount, 0);
+
+              if (outgoing.length > 0) {
+                return (
+                  <div style={{ ...card, borderTop: `3px solid ${C.coral}` }}>
+                    <div>
+                      <div style={bigLabel}>Bạn cần chuyển tổng cộng</div>
+                      <div style={bigNum(C.orangeText)}>{fmt(sum(outgoing))}</div>
+                    </div>
+                    {outgoing.map((t) => {
+                      const to = memberOf(t.toId);
+                      return (
+                        <div key={t.toId} style={row}>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>
+                            cho {t.to}
+                            <div style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{fmt(t.amount)}</div>
+                          </div>
+                          {to?.qr_url ? (
+                            <button type="button" onClick={() => setQrView(t.toId)}
+                              style={{ background: C.ink, border: "none", color: "#fff", borderRadius: 9, padding: "10px 13px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                              <Scan size={15} weight="bold" aria-hidden="true" />Quét QR
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: 12.5, color: C.text2, whiteSpace: "nowrap" }}>{t.to} chưa có QR</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div style={{ fontSize: 12.5, color: C.text2, lineHeight: 1.5 }}>
+                      Trước khi chuyển, kiểm tra tên chủ tài khoản trong app ngân hàng đúng là người nhận.
+                    </div>
+                  </div>
+                );
+              }
+
+              if (incoming.length > 0) {
+                return (
+                  <div style={{ ...card, borderTop: `3px solid ${C.tealText}` }}>
+                    <div>
+                      <div style={bigLabel}>Bạn được nhận lại tổng cộng</div>
+                      <div style={bigNum(C.tealText)}>{fmt(sum(incoming))}</div>
+                    </div>
+                    {incoming.map((t) => (
+                      <div key={t.fromId} style={row}>
+                        <span style={{ fontSize: 13.5, fontWeight: 600 }}>từ {t.from}</span>
+                        <span style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{fmt(t.amount)}</span>
+                      </div>
+                    ))}
+                    {me.qr_url ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.text2 }}>
+                        <img src={me.qr_url} alt="Mã QR nhận tiền của bạn" onClick={() => setQrView(me.id)}
+                          style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", cursor: "pointer", boxShadow: "0 1px 3px rgba(2,48,71,.15)" }} />
+                        Mã QR của bạn đã sẵn sàng để mọi người quét.
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.5 }}>
+                          Thêm mã QR ngân hàng để người trả quét là chuyển được. Mở app ngân hàng, vào mã QR nhận tiền, chụp màn hình rồi chọn ảnh đó.
+                        </div>
+                        <label style={{ justifySelf: "start", display: "inline-flex", alignItems: "center", gap: 6, background: C.ink, color: "#fff", borderRadius: 10, padding: "11px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                          <Plus size={15} weight="bold" aria-hidden="true" />{qrBusyId === me.id ? "Đang tải ảnh..." : "Thêm mã QR"}
+                          <input type="file" accept="image/*" className="sr-only"
+                            onChange={(ev) => uploadQR(me, ev.target.files[0])} />
+                        </label>
+                      </>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div style={card}>
+                  <div style={{ fontWeight: 700, fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
+                    {entries.length === 0 ? "Chưa có khoản chi nào." : <>Bạn đã cân bằng <Check size={16} weight="bold" color={C.tealText} aria-hidden="true" /></>}
+                  </div>
+                  <div style={{ fontSize: 13.5, color: C.text2 }}>
+                    {entries.length === 0 ? "Nhập khoản chi ở tab Sổ chi tiêu, phần của bạn sẽ hiện ở đây." : "Bạn không cần chuyển hay nhận thêm gì."}
+                  </div>
                 </div>
-                <label style={{ display: "inline-block", background: C.ink, color: "#fff", borderRadius: 10, padding: "11px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  {qrBusyId === me.id ? "Đang tải ảnh..." : "Thêm mã QR"}
-                  <input type="file" accept="image/*" style={{ display: "none" }}
-                    onChange={(ev) => uploadQR(me, ev.target.files[0])} />
-                </label>
-              </div>
-            )}
+              );
+            })()}
+
+            <h2 style={sectionHead}>Hóa đơn tất toán</h2>
+            <div className="receipt" style={{ padding: "18px 14px 14px" }}>
+              {transactions.length === 0 ? (
+                <div style={{ textAlign: "center", color: C.text2, fontSize: 14 }}>Cả nhóm đã cân bằng, không ai nợ ai.</div>
+              ) : (
+                transactions.map((t, i) => {
+                  const mineRow = meId && (t.fromId === meId || t.toId === meId);
+                  const toMember = memberOf(t.toId);
+                  const qrBtn = { gridColumn: 2, gridRow: "1 / span 2", borderRadius: 9, padding: "9px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5, border: "none" };
+                  // Tên người trả → người nhận trên một hàng, số tiền bên dưới, nút QR canh phải:
+                  // không còn tràn khỏi hóa đơn trên màn hình 375px
+                  return (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", columnGap: 10, rowGap: 2, alignItems: "center", padding: "10px 8px", margin: "0 -4px", borderRadius: 10, background: mineRow ? "#F3F8FB" : "transparent" }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
+                        <span style={{ color: C.orangeText }}>{t.from}{t.fromId === meId ? " (bạn)" : ""}</span>
+                        <ArrowRight size={14} weight="bold" color={C.text2} aria-label="chuyển cho" />
+                        <span style={{ color: C.tealText }}>{t.to}{t.toId === meId ? " (bạn)" : ""}</span>
+                      </div>
+                      {toMember?.qr_url ? (
+                        <button type="button" onClick={() => setQrView(t.toId)} style={{ ...qrBtn, background: C.ink, color: "#fff" }}>
+                          <Scan size={15} weight="bold" aria-hidden="true" />Quét QR
+                        </button>
+                      ) : t.toId === meId ? (
+                        <label style={{ ...qrBtn, background: "#EDF5FA", color: C.ink }}>
+                          <Plus size={14} weight="bold" aria-hidden="true" />{qrBusyId === meId ? "Đang tải..." : "Thêm QR"}
+                          <input type="file" accept="image/*" className="sr-only"
+                            onChange={(ev) => uploadQR(me, ev.target.files[0])} />
+                        </label>
+                      ) : (
+                        <span style={{ gridColumn: 2, gridRow: "1 / span 2", fontSize: 12.5, color: C.text2, whiteSpace: "nowrap" }}>Chưa có QR</span>
+                      )}
+                      <div style={{ fontWeight: 800, fontSize: 16, fontVariantNumeric: "tabular-nums" }}>{fmt(t.amount)}</div>
+                    </div>
+                  );
+                })
+              )}
+              {transactions.length > 0 && (
+                <div style={{ textAlign: "center", fontSize: 11.5, color: C.text2, marginTop: 12, letterSpacing: 1.5 }}>
+                  CHỈ CẦN {transactions.length} LẦN CHUYỂN KHOẢN
+                </div>
+              )}
+            </div>
 
             {/* Chi phí THẬT mỗi người phải chịu cho chuyến (shareExp) — ai trả hộ cũng không đổi, chuyển tiền không tính */}
-            <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, marginBottom: 10 }}>CHI PHÍ MỖI NGƯỜI</div>
-            <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "14px 16px", marginBottom: 22 }}>
+            <h2 style={sectionHead}>Chi phí mỗi người</h2>
+            <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "14px 16px" }}>
               {[...members].sort((a, b) => detail[b.id].shareExp - detail[a.id].shareExp).map((m) => {
                 const cost = detail[m.id].shareExp;
                 const maxCost = Math.max(...members.map((x) => detail[x.id].shareExp), 1);
                 return (
                   <div key={m.id} style={{ marginBottom: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, marginBottom: 4 }}>
-                      <span style={{ fontWeight: 600 }}>{m.name}{m.id === meId && <span style={{ fontWeight: 400, color: "#7d8a90" }}> (bạn)</span>}</span>
+                      <span style={{ fontWeight: 600 }}>{m.name}{m.id === meId && <span style={{ fontWeight: 400, color: C.text2 }}> (bạn)</span>}</span>
                       <span style={{ fontWeight: 700 }}>{fmt(cost)}</span>
                     </div>
                     <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, overflow: "hidden" }}>
@@ -839,12 +965,12 @@ export default function TripPage() {
                   </div>
                 );
               })}
-              <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 4 }}>
+              <div style={{ fontSize: 11.5, color: C.text2, marginTop: 4 }}>
                 Phần chi phí thật mỗi người phải chịu cho chuyến, ai trả hộ cũng không đổi.
               </div>
             </div>
 
-            <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, marginBottom: 10 }}>SỐ DƯ TỪNG NGƯỜI</div>
+            <h2 style={sectionHead}>Số dư từng người</h2>
             {orderedMembers.map((m) => {
               const b = balances[m.id];
               const pos = b.net >= 0;
@@ -852,13 +978,13 @@ export default function TripPage() {
               return (
                 <div key={m.id} style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 14px", marginBottom: 9 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{m.name}{m.id === meId && <span style={{ fontWeight: 400, fontSize: 13, color: "#7d8a90" }}> (bạn)</span>}</div>
-                    <div style={{ fontWeight: 800, color: settled ? "#9aa6ab" : pos ? C.green : C.red, fontSize: 15 }}>
-                      {settled ? "đã cân bằng ✓" : (pos ? "nhận lại " : "trả thêm ") + fmt(Math.abs(b.net))}
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{m.name}{m.id === meId && <span style={{ fontWeight: 400, fontSize: 13, color: C.text2 }}> (bạn)</span>}</div>
+                    <div style={{ fontWeight: 800, color: settled ? C.text2 : pos ? C.tealText : C.orangeText, fontSize: 15, display: "inline-flex", alignItems: "center", gap: 4, fontVariantNumeric: "tabular-nums" }}>
+                      {settled ? <>đã cân bằng <Check size={14} weight="bold" aria-hidden="true" /></> : (pos ? "nhận lại " : "trả thêm ") + fmt(Math.abs(b.net))}
                     </div>
                   </div>
                   {/* Tóm tắt 1 dòng: đã chi bao nhiêu trên phần chi phí của mình */}
-                  <div style={{ fontSize: 12.5, color: "#7d8a90", marginTop: 3 }}>
+                  <div style={{ fontSize: 12.5, color: C.text2, marginTop: 3 }}>
                     Đã chi {fmt(detail[m.id].outlay)} trên phần chi phí {fmt(detail[m.id].shareExp)}
                   </div>
                   <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
@@ -870,17 +996,17 @@ export default function TripPage() {
                       <>
                         <img src={m.qr_url} alt={`Mã QR của ${m.name}`} onClick={() => setQrView(m.id)}
                           style={{ width: 44, height: 44, borderRadius: 6, boxShadow: "0 1px 3px rgba(2,48,71,.15)", cursor: "pointer", objectFit: "cover" }} />
-                        <span style={{ fontSize: 13, color: "#7d8a90" }}>Mã QR nhận tiền. Bấm ảnh để phóng to.</span>
+                        <span style={{ fontSize: 13, color: C.text2 }}>Mã QR nhận tiền. Bấm ảnh để phóng to.</span>
                         <label style={{ fontSize: 13, color: C.ink, fontWeight: 600, cursor: "pointer", marginLeft: "auto", padding: "8px 0" }}>
                           {qrBusyId === m.id ? "Đang tải ảnh..." : "Đổi ảnh"}
-                          <input type="file" accept="image/*" style={{ display: "none" }}
+                          <input type="file" accept="image/*" className="sr-only"
                             onChange={(ev) => uploadQR(m, ev.target.files[0])} />
                         </label>
                       </>
                     ) : (
                       <label style={{ display: "inline-block", fontSize: 13.5, color: C.ink, fontWeight: 600, background: "#EDF5FA", borderRadius: 10, padding: "10px 14px", cursor: "pointer", whiteSpace: "nowrap" }}>
                         {qrBusyId === m.id ? "Đang tải ảnh..." : m.id === meId ? "Thêm mã QR của bạn" : `Thêm mã QR của ${m.name}`}
-                        <input type="file" accept="image/*" style={{ display: "none" }}
+                        <input type="file" accept="image/*" className="sr-only"
                           onChange={(ev) => uploadQR(m, ev.target.files[0])} />
                       </label>
                     )}
@@ -899,56 +1025,13 @@ export default function TripPage() {
               </div>
             )}
 
-            <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, margin: "24px 0 10px" }}>HÓA ĐƠN TẤT TOÁN</div>
-            <div className="receipt" style={{ padding: "20px 18px 16px" }}>
-              {transactions.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#7d8a90", fontSize: 14 }}>Cả nhóm đã cân bằng, không ai nợ ai.</div>
-              ) : (
-                transactions.map((t, i) => {
-                  const mineRow = meId && (t.fromId === meId || t.toId === meId);
-                  const toMember = memberOf(t.toId);
-                  return (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "12px 10px", margin: "0 -10px", borderRadius: 10, background: mineRow ? "#F3F8FB" : "transparent" }}>
-                      <div style={{ fontSize: 14.5 }}>
-                        <b style={{ color: C.red }}>{t.from}{t.fromId === meId ? " (bạn)" : ""}</b>
-                        <span style={{ color: "#9aa6ab", margin: "0 8px" }}>──→</span>
-                        <b style={{ color: C.green }}>{t.to}{t.toId === meId ? " (bạn)" : ""}</b>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                        <div style={{ fontWeight: 800, fontSize: 15 }}>{fmt(t.amount)}</div>
-                        {toMember?.qr_url ? (
-                          <button onClick={() => setQrView(t.toId)}
-                            style={{ background: C.ink, border: "none", color: "#fff", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                            Quét QR
-                          </button>
-                        ) : t.toId === meId ? (
-                          <label style={{ background: "#EDF5FA", color: C.ink, borderRadius: 8, padding: "9px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                            {qrBusyId === meId ? "Đang tải..." : "Thêm QR"}
-                            <input type="file" accept="image/*" style={{ display: "none" }}
-                              onChange={(ev) => uploadQR(me, ev.target.files[0])} />
-                          </label>
-                        ) : (
-                          <span style={{ fontSize: 12, color: "#7d8a90", whiteSpace: "nowrap" }}>Chưa có QR</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              {transactions.length > 0 && (
-                <div style={{ textAlign: "center", fontSize: 11.5, color: "#7d8a90", marginTop: 14, letterSpacing: 1.5 }}>
-                  CHỈ CẦN {transactions.length} LẦN CHUYỂN KHOẢN
-                </div>
-              )}
-            </div>
-
-            <div style={{ fontSize: 11, letterSpacing: 2, color: "#9aa6ab", fontWeight: 700, margin: "24px 0 10px" }}>FACT THÚ VỊ</div>
+            <h2 style={sectionHead}>Fact thú vị</h2>
             {/* Luật phân cấp: số càng quan trọng nền càng đậm. 4 card = đủ 4 màu Riviera */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
               <div style={{ background: C.coral, color: C.ink, borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.75 }}>Đại gia của chuyến đi 👑</div>
-                <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3 }}>{topSpender?.name || "—"}</div>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>{topSpender ? "ứng trước " + fmt(paidReal[topSpender.id]) : ""}</div>
+                <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3 }}>{hasTopSpender ? topSpender.name : "—"}</div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>{hasTopSpender ? "ứng trước " + fmt(paidReal[topSpender.id]) : ""}</div>
               </div>
               <div style={{ background: "#FFB703", color: C.ink, borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Khoản chi khủng nhất 💸</div>
@@ -1002,18 +1085,32 @@ export default function TripPage() {
           const stickyLeft = scrollMode ? { position: "sticky", left: 0, zIndex: 1 } : {};
           const itemCell = { padding: "7px 8px", borderRadius: 6, textAlign: "left", fontSize: 12, lineHeight: 1.35, ...stickyLeft };
           const numCell = { padding: "10px 2px", borderRadius: 6, textAlign: "center", fontSize: 12, whiteSpace: "nowrap" };
-          const subStyle = { fontSize: 11, color: "#7d8a90", fontWeight: 400 };
+          const subStyle = { fontSize: 11, color: C.text2, fontWeight: 400 };
           const thStyle = {
             padding: "10px 0 6px", fontSize: 12, fontWeight: 700, color: C.ink, background: C.paper,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             ...(scrollMode ? {} : { position: "sticky", top: 40, zIndex: 4 }),
           };
+          const nameHeader = (
+            <tr>
+              <th style={{ ...thStyle, ...stickyLeft, zIndex: 2 }}></th>
+              {orderedMembers.map((m) => <th key={m.id} scope="col" style={{ ...thStyle, ...(m.id === meId ? { background: "#E8F4F9", borderRadius: 6 } : {}) }}>{m.name}</th>)}
+            </tr>
+          );
+          const tableStyle = { width: "100%", minWidth: 104 + members.length * 56, tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 3 };
+          const cols = (
+            <colgroup>
+              <col style={{ width: 104 }} />
+              {orderedMembers.map((m) => <col key={m.id} />)}
+            </colgroup>
+          );
 
           const sectionRow = (label) => (
             <tr key={label}>
               <td colSpan={members.length + 1}
-                style={{ background: "transparent", padding: "12px 4px 2px", textAlign: "left", fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: "#9aa6ab" }}>
-                {label}
+                style={{ background: "transparent", padding: "12px 4px 2px", textAlign: "left", fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: C.text2 }}>
+                {/* Nhãn nhóm dính bên trái để không bị cắt khi cuộn ngang */}
+                <span style={{ position: "sticky", left: 4, display: "inline-block", maxWidth: "calc(100vw - 48px)" }}>{label}</span>
               </td>
             </tr>
           );
@@ -1033,7 +1130,7 @@ export default function TripPage() {
                   </div>
                   {isT && !defaultNote && <div style={subStyle}>{e.name}</div>}
                   {e.currency !== "VND" && (
-                    <div style={{ ...subStyle, color: "#9aa6ab" }}>{Number(e.amount).toLocaleString("vi-VN")} {e.currency}</div>
+                    <div style={{ ...subStyle, color: C.text2 }}>{Number(e.amount).toLocaleString("vi-VN")} {e.currency}</div>
                   )}
                 </td>
                 {orderedMembers.map((m) => {
@@ -1041,7 +1138,7 @@ export default function TripPage() {
                   const zero = Math.round(net / 1000) === 0;
                   return (
                     <td key={m.id}
-                      style={{ ...numCell, background: involved ? bgFor(net, isT ? "soft" : "normal") : "#fff", color: !involved || zero ? "#9aa6ab" : C.ink, fontWeight: involved && !zero ? 700 : 400 }}>
+                      style={{ ...numCell, background: involved ? bgFor(net, isT ? "soft" : "normal") : "#fff", color: !involved || zero ? C.text2 : C.ink, fontWeight: involved && !zero ? 700 : 400 }}>
                       {involved ? signedK(net) : "—"}
                     </td>
                   );
@@ -1052,7 +1149,7 @@ export default function TripPage() {
 
           if (entries.length === 0) {
             return (
-              <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: 20, textAlign: "center", color: "#7d8a90", fontSize: 14 }}>
+              <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: 20, textAlign: "center", color: C.text2, fontSize: 14 }}>
                 Chưa có khoản nào để tổng hợp.
               </div>
             );
@@ -1060,23 +1157,26 @@ export default function TripPage() {
 
           return (
             <>
-              <div style={{ fontSize: 12.5, color: "#5d6d77", background: "#F3F8FB", borderRadius: 10, padding: "10px 12px", marginBottom: 12, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12.5, color: C.text2, background: "#F3F8FB", borderRadius: 10, padding: "10px 12px", marginBottom: 12, lineHeight: 1.5 }}>
                 Xem lại trước khi chuyển tiền: có khoản nào thừa hoặc thiếu không, mỗi khoản chia đúng người và đúng số tiền chưa.
                 Thấy sai thì bấm tên khoản để sửa.
               </div>
 
-              <div style={scrollMode ? { overflowX: "auto" } : undefined}>
-                <table style={{ width: "100%", minWidth: 104 + members.length * 56, tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 3 }}>
-                  <colgroup>
-                    <col style={{ width: 104 }} />
-                    {orderedMembers.map((m) => <col key={m.id} />)}
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th style={{ ...thStyle, ...stickyLeft }}></th>
-                      {orderedMembers.map((m) => <th key={m.id} style={{ ...thStyle, ...(m.id === meId ? { background: "#E8F4F9", borderRadius: 6 } : {}) }}>{m.name}</th>)}
-                    </tr>
-                  </thead>
+              {/* Nhiều người thì bảng cuộn ngang, mà khung cuộn ngang làm hàng tên hết dính được.
+                  Nên vẽ riêng một hàng tên dính dưới thanh tab, cuộn ngang đồng bộ với bảng:
+                  cuộn tới đâu vẫn biết cột nào của ai. */}
+              {scrollMode && (
+                <div ref={matrixHeadRef} aria-hidden="true"
+                  style={{ position: "sticky", top: 44, zIndex: 4, overflow: "hidden", background: C.paper, boxShadow: "0 1px 0 rgba(2,48,71,.08)" }}>
+                  <table style={tableStyle}>{cols}<thead>{nameHeader}</thead></table>
+                </div>
+              )}
+              <div style={scrollMode ? { overflowX: "auto" } : undefined}
+                onScroll={scrollMode ? (ev) => { if (matrixHeadRef.current) matrixHeadRef.current.scrollLeft = ev.currentTarget.scrollLeft; } : undefined}>
+                <table style={tableStyle}>
+                  {cols}
+                  {/* Ở chế độ cuộn, hàng tên thật vẫn nằm đây cho trình đọc màn hình, chỉ ẩn khỏi mắt */}
+                  <thead style={scrollMode ? { visibility: "collapse" } : undefined}>{nameHeader}</thead>
                   <tbody>
                     {expRows.length > 0 && sectionRow("KHOẢN CHI")}
                     {expRows.map(renderRow)}
@@ -1100,7 +1200,7 @@ export default function TripPage() {
                       {orderedMembers.map((m) => {
                         const net = balances[m.id].net;
                         return (
-                          <td key={m.id} style={{ ...numCell, background: bgFor(net, "strong"), color: Math.round(net / 1000) === 0 ? "#9aa6ab" : C.ink, fontWeight: 700 }}>
+                          <td key={m.id} style={{ ...numCell, background: bgFor(net, "strong"), color: Math.round(net / 1000) === 0 ? C.text2 : C.ink, fontWeight: 700 }}>
                             {signedK(net)}
                           </td>
                         );
@@ -1110,13 +1210,13 @@ export default function TripPage() {
                 </table>
               </div>
 
-              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "#7d8a90", marginTop: 12 }}>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: C.text2, marginTop: 12 }}>
                 <span><i style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, marginRight: 6, background: "rgba(33,158,188,.6)" }}></i>Đã trả, được nhận lại</span>
                 <span><i style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, marginRight: 6, background: "rgba(251,133,0,.6)" }}></i>Phải trả</span>
                 <span>— Không liên quan</span>
                 {me && <span>Cột nền xanh nhạt là của bạn</span>}
               </div>
-              <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 6 }}>
+              <div style={{ fontSize: 11.5, color: C.text2, marginTop: 6 }}>
                 Số làm tròn đến nghìn đồng. Số chính xác xem ở tab Tổng kết.
               </div>
             </>
@@ -1124,42 +1224,191 @@ export default function TripPage() {
         })()}
       </div>
 
+      {/* Nút thêm khoản chi luôn nằm cuối màn hình ở tab Sổ chi tiêu */}
+      {tab === "expenses" && !sheetOpen && (
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 20, padding: "0 16px calc(14px + env(safe-area-inset-bottom, 0px))", pointerEvents: "none" }}>
+          <button type="button" onClick={openAdd}
+            style={{ pointerEvents: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", maxWidth: 608, margin: "0 auto", padding: 14, background: C.coral, color: C.ink, border: "none", borderRadius: 14, fontWeight: 800, fontSize: 15, cursor: "pointer", boxShadow: "0 6px 18px rgba(2,48,71,.22)" }}>
+            <Plus size={17} weight="bold" aria-hidden="true" />Thêm khoản chi
+          </button>
+        </div>
+      )}
+
+      {/* Tấm nhập / sửa khoản: trượt từ dưới lên, cả form và nút Lưu nằm gọn trong một màn hình */}
+      {sheetOpen && (
+        <div className="scrim" onClick={closeSheet}
+          style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.45)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" onClick={(e) => e.stopPropagation()}
+            style={{ background: editingId ? "#FFF9F2" : "#fff", width: "100%", maxWidth: 640, maxHeight: "92dvh", overflowY: "auto", borderRadius: "18px 18px 0 0", padding: "8px 16px calc(16px + env(safe-area-inset-bottom, 0px))", boxShadow: "0 -8px 30px rgba(2,48,71,.18)" }}>
+            <div style={{ width: 38, height: 4, borderRadius: 4, background: C.line, margin: "0 auto 8px" }} aria-hidden="true" />
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+              <h2 id="sheet-title" style={{ flex: 1, fontSize: 17, fontWeight: 800, color: C.ink }}>{editingId ? "Sửa khoản đã nhập" : "Thêm khoản mới"}</h2>
+              {editingId && (
+                // Xóa nằm trong chế độ sửa: danh sách gọn hơn, xóa vẫn có hộp xác nhận
+                <button type="button" onClick={() => setDeleteTarget(entries.find((x) => x.id === editingId))}
+                  style={{ border: "none", background: "none", color: C.orangeText, cursor: "pointer", fontSize: 13.5, fontWeight: 700, padding: "8px 6px", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <Trash size={15} weight="bold" aria-hidden="true" />Xóa
+                </button>
+              )}
+              <button type="button" onClick={closeSheet} aria-label="Đóng"
+                style={{ border: "none", background: "#EDF5FA", color: C.ink, cursor: "pointer", borderRadius: 999, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <X size={16} weight="bold" />
+              </button>
+            </div>
+            <div>
+              <div role="tablist" aria-label="Loại khoản" style={{ display: "flex", marginBottom: 14, borderRadius: 10, overflow: "hidden" }}>
+                <button type="button" role="tab" aria-selected={fType === "expense"} className={`typebtn ${fType === "expense" ? "on" : ""}`} style={{ borderRadius: "10px 0 0 10px" }}
+                  onClick={() => setFType("expense")}>Khoản chi</button>
+                <button type="button" role="tab" aria-selected={fType === "transfer"} className={`typebtn ${fType === "transfer" ? "on" : ""}`} style={{ borderRadius: "0 10px 10px 0" }}
+                  onClick={() => setFType("transfer")}>Trả nợ</button>
+              </div>
+
+              {fType === "expense" ? (
+                <>
+                  <label htmlFor="f-name" style={fieldLabel}>Tên khoản chi</label>
+                  <input id="f-name" ref={sheetNameRef} className="inp" placeholder="vd: Ăn trưa ngày 3" value={fName}
+                    onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 12 }} />
+
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.3fr) 88px minmax(0,1fr)", gap: 8, marginBottom: 12 }}>
+                    <div>
+                      <label htmlFor="f-amount" style={fieldLabel}>Số tiền</label>
+                      <input id="f-amount" className="inp" type="text" inputMode="decimal" placeholder="0" value={fAmount}
+                        onChange={(e) => setFAmount(formatAmountInput(e.target.value, fAmount, e.nativeEvent?.data, fCurrency !== "VND"))} />
+                    </div>
+                    <div>
+                      <label htmlFor="f-currency" style={fieldLabel}>Tiền</label>
+                      <select id="f-currency" className="inp" value={fCurrency} onChange={(e) => changeCurrency(e.target.value)}>
+                        {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="f-payer" style={fieldLabel}>Ai trả</label>
+                      <select id="f-payer" className="inp" value={fPayer} onChange={(e) => setFPayer(e.target.value)}>
+                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div id="f-parts-label" style={fieldLabel}>Chia cho ai <span style={{ fontWeight: 400, color: C.text2 }}>· chọn từng người hoặc Cả nhóm</span></div>
+                  <div role="group" aria-labelledby="f-parts-label" style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+                    {members.map((m) => {
+                      const on = fParts.includes(m.id);
+                      return (
+                        <button type="button" key={m.id} aria-pressed={on} className={`chip ${on ? "on" : ""}`}
+                          onClick={() => setFParts((prev) => prev.includes(m.id) ? prev.filter((p) => p !== m.id) : [...prev, m.id])}>
+                          {on && <Check size={13} weight="bold" aria-hidden="true" />}{m.name}
+                        </button>
+                      );
+                    })}
+                    {(() => {
+                      const allOn = allIds.length > 0 && fParts.length === allIds.length;
+                      return (
+                        <button type="button" aria-pressed={allOn} className={`chip ${allOn ? "on" : ""}`}
+                          onClick={() => setFParts(allOn ? [] : allIds)}>
+                          {allOn && <Check size={13} weight="bold" aria-hidden="true" />}Cả nhóm
+                        </button>
+                      );
+                    })()}
+                  </div>
+
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13.5, marginBottom: 14, cursor: "pointer", lineHeight: 1.45 }}>
+                    <input type="checkbox" checked={fPrepaid} onChange={(e) => setFPrepaid(e.target.checked)}
+                      style={{ marginTop: 2, width: 18, height: 18, flexShrink: 0, accentColor: C.ink }} />
+                    <span>
+                      Chi trước chuyến đi (đặt cọc, mua vé trước)
+                      <br /><span style={{ fontSize: 12, color: C.text2 }}>Chỉ để gắn nhãn và gom riêng ở tab Tổng kết, không đổi cách chia tiền.</span>
+                    </span>
+                  </label>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)", gap: 8, alignItems: "end", marginBottom: 12 }}>
+                    <div>
+                      <label htmlFor="t-from" style={fieldLabel}>Người trả</label>
+                      <select id="t-from" className="inp" value={fPayer} onChange={(e) => setFPayer(e.target.value)}>
+                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <ArrowRight size={18} color={C.text2} aria-hidden="true" style={{ marginBottom: 11 }} />
+                    <div>
+                      <label htmlFor="t-to" style={fieldLabel}>Người nhận</label>
+                      <select id="t-to" className="inp" value={fReceiver} onChange={(e) => setFReceiver(e.target.value)}>
+                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 88px", gap: 8, marginBottom: 12 }}>
+                    <div>
+                      <label htmlFor="t-amount" style={fieldLabel}>Số tiền</label>
+                      <input id="t-amount" className="inp" type="text" inputMode="decimal" placeholder="0" value={fAmount}
+                        onChange={(e) => setFAmount(formatAmountInput(e.target.value, fAmount, e.nativeEvent?.data, fCurrency !== "VND"))} />
+                    </div>
+                    <div>
+                      <label htmlFor="t-currency" style={fieldLabel}>Tiền</label>
+                      <select id="t-currency" className="inp" value={fCurrency} onChange={(e) => changeCurrency(e.target.value)}>
+                        {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <label htmlFor="t-note" style={fieldLabel}>Ghi chú <span style={{ fontWeight: 400, color: C.text2 }}>(không bắt buộc)</span></label>
+                  <input id="t-note" className="inp" placeholder="vd: Duyên trả lại tiền ăn tối" value={fName}
+                    onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 14 }} />
+                  <div style={{ fontSize: 12, color: C.text2, background: "#F3F8FB", borderRadius: 10, padding: "8px 12px", marginBottom: 14, lineHeight: 1.5 }}>
+                    Dùng khi A đưa tiền lại cho B để trả nợ. Khoản này không tính vào chi phí.
+                    Nếu A trả hộ một khoản chi cho B (vd tiền homestay), nhập ở tab Khoản chi: A trả, chia cho B.
+                  </div>
+                </>
+              )}
+
+              {formError && (
+                <div role="alert" style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{formError}</div>
+              )}
+              <button type="button" onClick={addEntry} disabled={busy}
+                style={{ width: "100%", padding: 12, background: busy ? "#c4ccd0" : (fType === "expense" ? C.coral : C.purple), color: fType === "expense" || busy ? C.ink : "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer" }}>
+                {busy ? "Đang lưu..." : editingId ? "Cập nhật khoản này" : (fType === "expense" ? "Lưu khoản chi" : "Ghi nhận trả nợ")}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* Modal Cài đặt: gộp sửa tên chuyến, quản lý thành viên, và tỉ giá vào một chỗ */}
       {settingsOpen && (
-        <div onClick={() => setSettingsOpen(false)}
+        <div onClick={closeSettings}
           style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, cursor: "pointer", padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()}
             style={{ background: "#fff", borderRadius: 18, padding: 22, maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto", cursor: "default" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <div style={{ fontWeight: 800, fontSize: 18, color: C.ink }}>Cài đặt chuyến đi</div>
-              <button onClick={() => setSettingsOpen(false)}
-                style={{ border: "none", background: "none", fontSize: 20, color: "#9aa6ab", cursor: "pointer", lineHeight: 1 }}>✕</button>
+              <button onClick={closeSettings}
+                aria-label="Đóng cài đặt" style={{ border: "none", background: "none", color: C.text2, cursor: "pointer", padding: 6, margin: -6, display: "flex" }}><X size={20} weight="bold" /></button>
             </div>
 
             {/* --- Bạn là ai --- */}
-            <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700, marginBottom: 8 }}>BẠN LÀ AI</div>
+            <h3 style={settingsHead}>Bạn là ai</h3>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 6 }}>
               {members.map((m) => (
-                <span key={m.id} className={`chip ${m.id === meId ? "on" : ""}`} onClick={() => chooseMe(m.id)}>{m.name}</span>
+                <button type="button" key={m.id} aria-pressed={m.id === meId} className={`chip ${m.id === meId ? "on" : ""}`} onClick={() => chooseMe(m.id)}>{m.name}</button>
               ))}
             </div>
-            <div style={{ fontSize: 12, color: "#7d8a90", marginBottom: 24 }}>
+            <div style={{ fontSize: 12, color: C.text2, marginBottom: 24 }}>
               Chỉ nhớ trên máy này. App dùng để điền sẵn người trả và đưa phần của bạn lên đầu.
             </div>
 
             {/* --- Tên chuyến đi --- */}
-            <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700, marginBottom: 8 }}>TÊN CHUYẾN ĐI</div>
+            <h3 style={settingsHead}>Tên chuyến đi</h3>
             <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-              <input className="inp" value={tripNameInput} onChange={(e) => setTripNameInput(e.target.value)} style={{ flex: 1 }} />
+              <input className="inp" aria-label="Tên chuyến đi" value={tripNameInput} onChange={(e) => setTripNameInput(e.target.value)} style={{ flex: 1 }} />
               <button onClick={saveTripName}
-                style={{ background: tripNameSaved ? C.green : C.coral, color: "#fff", border: "none", borderRadius: 10, padding: "0 18px", fontWeight: 700, cursor: "pointer", fontSize: 13.5 }}>
-                {tripNameSaved ? "✓ Đã lưu" : "Lưu"}
+                style={{ background: tripNameSaved ? C.tealText : C.coral, color: tripNameSaved ? "#fff" : C.ink, border: "none", borderRadius: 10, padding: "0 18px", fontWeight: 700, cursor: "pointer", fontSize: 13.5 }}>
+                {tripNameSaved ? "Đã lưu" : "Lưu"}
               </button>
             </div>
 
             {/* --- Thành viên --- */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700 }}>THÀNH VIÊN</div>
+              <h3 style={{ ...settingsHead, marginBottom: 0 }}>Thành viên</h3>
               <button onClick={openAddMember}
                 style={{ border: "none", background: "none", color: C.ink, fontSize: 13.5, fontWeight: 700, padding: "8px 0", cursor: "pointer" }}>
                 Thêm thành viên
@@ -1170,7 +1419,7 @@ export default function TripPage() {
                 <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0" }}>
                   <span style={{ fontSize: 14.5 }}>{m.name}</span>
                   <button onClick={() => openRenameMember(m)}
-                    style={{ border: "none", background: "none", color: "#5d6d77", fontSize: 13.5, fontWeight: 600, padding: "8px 0", cursor: "pointer" }}>
+                    style={{ border: "none", background: "none", color: C.text2, fontSize: 13.5, fontWeight: 600, padding: "8px 0", cursor: "pointer" }}>
                     Sửa tên
                   </button>
                 </div>
@@ -1178,34 +1427,34 @@ export default function TripPage() {
             </div>
 
             {/* --- Tỉ giá --- */}
-            <div style={{ fontSize: 11, letterSpacing: 1.5, color: "#9aa6ab", fontWeight: 700, marginBottom: 8 }}>TỈ GIÁ QUY ĐỔI RA VND</div>
+            <h3 style={settingsHead}>Tỉ giá quy đổi ra VND</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
               {currencyList.filter((c) => c !== "VND").map((cur) => (
                 <div key={cur} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
                   <span style={{ width: 46, flexShrink: 0 }}>1 {cur} =</span>
-                  <input type="number" value={rates[cur]}
-                    onChange={(e) => { setRates({ ...rates, [cur]: parseFloat(e.target.value) || 0 }); setRatesDirty(true); }}
+                  <input type="number" inputMode="decimal" aria-label={`Tỉ giá 1 ${cur} ra VND`} value={ratesDraft?.[cur] ?? rates[cur]}
+                    onChange={(e) => setRatesDraft({ ...ratesDraft, [cur]: e.target.value })}
                     className="inp" style={{ flex: 1 }} />
                   <span>₫</span>
                 </div>
               ))}
-              {ratesDirty && (
-                <button onClick={() => saveRates(rates)}
-                  style={{ background: C.teal, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, cursor: "pointer", fontSize: 12.5, alignSelf: "flex-start" }}>
+              {ratesDraft && (
+                <button onClick={() => saveRates({ ...rates, ...ratesDraft }).then((ok) => { if (ok) setRatesDraft(null); })}
+                  style={{ background: C.tealText, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, cursor: "pointer", fontSize: 12.5, alignSelf: "flex-start" }}>
                   Lưu tỉ giá
                 </button>
               )}
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <input placeholder="Mã (vd JPY)" value={newCur} onChange={(e) => setNewCur(e.target.value)} className="inp" style={{ flex: 1, minWidth: 90 }} />
-              <input type="number" placeholder="Tỉ giá ra VND" value={newRate} onChange={(e) => setNewRate(e.target.value)} className="inp" style={{ flex: 1, minWidth: 100 }} />
+              <input placeholder="Mã (vd JPY)" aria-label="Mã tiền tệ mới" value={newCur} onChange={(e) => setNewCur(e.target.value)} className="inp" style={{ flex: 1, minWidth: 90 }} />
+              <input type="number" placeholder="Tỉ giá ra VND" aria-label="Tỉ giá tiền tệ mới ra VND" value={newRate} onChange={(e) => setNewRate(e.target.value)} className="inp" style={{ flex: 1, minWidth: 100 }} />
               <button onClick={addCurrency}
-                style={{ background: C.coral, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-                ＋ Thêm
+                style={{ background: C.coral, color: C.ink, border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <Plus size={14} weight="bold" aria-hidden="true" />Thêm
               </button>
             </div>
             {curError && <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "8px 12px", marginTop: 8 }}>{curError}</div>}
-            <div style={{ fontSize: 11.5, color: "#9aa6ab", marginTop: 10 }}>
+            <div style={{ fontSize: 11.5, color: C.text2, marginTop: 10 }}>
               Cả nhóm dùng chung các tỉ giá này. Sửa xong nhớ bấm Lưu tỉ giá.
             </div>
           </div>
@@ -1233,7 +1482,7 @@ export default function TripPage() {
                 Hủy
               </button>
               <button onClick={submitMemberModal} disabled={memberBusy || !memberNameInput.trim()}
-                style={{ flex: 1, background: memberBusy ? "#c4ccd0" : C.coral, border: "none", color: "#fff", borderRadius: 10, padding: "10px 0", fontWeight: 700, cursor: memberBusy ? "wait" : "pointer", fontSize: 14 }}>
+                style={{ flex: 1, background: memberBusy ? "#c4ccd0" : C.coral, border: "none", color: C.ink, borderRadius: 10, padding: "10px 0", fontWeight: 700, cursor: memberBusy ? "wait" : "pointer", fontSize: 14 }}>
                 {memberBusy ? "Đang lưu..." : "Lưu"}
               </button>
             </div>
@@ -1246,7 +1495,7 @@ export default function TripPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 65, padding: 16 }}>
           <div style={{ background: "#fff", borderRadius: 16, padding: 20, maxWidth: 360, width: "100%", maxHeight: "85vh", overflowY: "auto" }}>
             <div style={{ fontWeight: 800, fontSize: 17, color: C.ink, marginBottom: 4 }}>Bạn là ai trong chuyến này?</div>
-            <div style={{ fontSize: 13.5, color: "#5d6d77", lineHeight: 1.5, marginBottom: 14 }}>
+            <div style={{ fontSize: 13.5, color: C.text2, lineHeight: 1.5, marginBottom: 14 }}>
               App sẽ điền sẵn tên bạn khi nhập khoản chi và đưa phần của bạn lên đầu. Chỉ nhớ trên máy này.
             </div>
             {members.map((m) => (
@@ -1261,7 +1510,7 @@ export default function TripPage() {
                 Tên mình chưa có
               </button>
               <button onClick={skipWho}
-                style={{ border: "none", background: "none", color: "#5d6d77", fontSize: 13.5, fontWeight: 600, padding: "10px 0", cursor: "pointer" }}>
+                style={{ border: "none", background: "none", color: C.text2, fontSize: 13.5, fontWeight: 600, padding: "10px 0", cursor: "pointer" }}>
                 Để sau
               </button>
             </div>
@@ -1276,7 +1525,7 @@ export default function TripPage() {
           <div onClick={(e) => e.stopPropagation()}
             style={{ background: "#fff", borderRadius: 16, padding: 20, maxWidth: 340, width: "100%", cursor: "default" }}>
             <div style={{ fontWeight: 800, fontSize: 16, color: C.ink, marginBottom: 6 }}>Xóa khoản này?</div>
-            <div style={{ fontSize: 14, color: "#5d6d77", lineHeight: 1.5, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, color: C.text2, lineHeight: 1.5, marginBottom: 16 }}>
               {deleteTarget.type === "transfer"
                 ? `${nameOf(deleteTarget.payer_id)} trả nợ ${nameOf(deleteTarget.participant_ids[0])}`
                 : deleteTarget.name}
@@ -1303,7 +1552,7 @@ export default function TripPage() {
           <div onClick={(e) => e.stopPropagation()}
             style={{ background: "#fff", borderRadius: 16, padding: 20, maxWidth: 340, width: "100%", cursor: "default" }}>
             <div style={{ fontWeight: 800, fontSize: 16, color: C.ink, marginBottom: 6 }}>Lưu chuyến này vào tài khoản?</div>
-            <div style={{ fontSize: 14, color: "#5d6d77", lineHeight: 1.5, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, color: C.text2, lineHeight: 1.5, marginBottom: 16 }}>
               Bạn sẽ đăng nhập bằng Google. Sau đó chuyến này nằm trong danh sách ở trang chủ, mở lại lúc nào cũng được, kể cả khi đổi máy.
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -1338,6 +1587,10 @@ export default function TripPage() {
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 20, textAlign: "center", maxWidth: 320, width: "100%", cursor: "default" }}>
             <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 12 }}>Chuyển tiền cho {nameOf(qrView)}</div>
             <img src={memberOf(qrView).qr_url} alt={`QR của ${nameOf(qrView)}`} style={{ width: "100%", borderRadius: 10 }} />
+            {/* Ai có link cũng đổi được ảnh QR, nên nhắc người chuyển tự kiểm tra tên chủ tài khoản */}
+            <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginTop: 12, lineHeight: 1.45, textAlign: "left" }}>
+              Trước khi chuyển, kiểm tra tên chủ tài khoản trong app ngân hàng đúng là {nameOf(qrView)}.
+            </div>
             <button onClick={() => setQrView(null)}
               style={{ marginTop: 14, width: "100%", padding: 10, background: "#023047", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
               Đóng

@@ -9,11 +9,61 @@ html,
 body {
   background: #f6fbfe; /* nền giấy ngả trời */
   color: #023047;      /* chữ Prussian Blue */
-  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
 button,
 input,
 select {
   font-family: inherit;
+}
+
+/* Viền focus khi dùng bàn phím: cùng màu Blue Green với viền ô nhập */
+:focus-visible {
+  outline: 2px solid #219ebc;
+  outline-offset: 2px;
+}
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #219ebc;
+}
+/* Nút chọn ảnh QR là <label> bọc input ẩn: input được focus thì viền hiện trên label */
+label:has(> .sr-only:focus-visible) {
+  outline: 2px solid #219ebc;
+  outline-offset: 2px;
+}
+
+/* Chữ gợi ý trong ô nhập: màu mặc định của trình duyệt chỉ đạt ~4.2:1 trên nền ô xanh nhạt */
+::placeholder {
+  color: #56656e;
+  opacity: 1;
+}
+
+::selection {
+  background: #8ecae6;
+  color: #023047;
+}
+
+/* Ẩn khỏi mắt nhưng vẫn bấm được bằng bàn phím và trình đọc màn hình */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Nút dạng chữ / dạng hàng: bỏ kiểu mặc định của trình duyệt */
+.btn-reset {
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
 }
