@@ -67,3 +67,66 @@ label:has(> .sr-only:focus-visible) {
   text-align: inherit;
   cursor: pointer;
 }
+
+/* Bong bóng giải thích (component Tip): hiện khi rê chuột trên máy tính,
+   hoặc khi chọn nút bằng bàn phím. Điện thoại không có rê chuột nên không hiện. */
+.tip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.tip-wrap > button {
+  flex: 1;
+}
+.tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: max-content;
+  max-width: min(250px, calc(100vw - 32px));
+  padding: 8px 11px;
+  border-radius: 9px;
+  background: #023047;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 6px 18px rgba(2, 48, 71, 0.25);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out, visibility 0.12s;
+}
+.tip-start .tip {
+  left: 0;
+  transform: none;
+}
+.tip-end .tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.tip-light .tip {
+  background: #fff;
+  color: #023047;
+}
+@media (hover: hover) {
+  .tip-wrap:hover .tip {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0.35s; /* chờ một chút để không nhấp nháy khi chuột lướt qua */
+  }
+}
+.tip-wrap:has(:focus-visible) .tip {
+  opacity: 1;
+  visibility: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tip {
+    transition: none;
+  }
+}

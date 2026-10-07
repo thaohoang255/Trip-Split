@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { cloneElement, useEffect, useState, useCallback, useRef, useId } from "react";
 import { useParams } from "next/navigation";
 import { ArrowRight, CaretRight, Check, Plus, Scan, Trash, X } from "@phosphor-icons/react";
 import { supabase } from "../../../lib/supabase";
@@ -115,6 +115,19 @@ const C = {
   orangeText: "#A84B00", // chữ "trả thêm"
 };
 
+// Lời giải thích nhỏ hiện khi rê chuột (máy tính) hoặc khi chọn nút bằng bàn phím.
+// align: "start" | "center" | "end" để bong bóng không tràn ra mép màn hình.
+// tone "light" dùng trên header nền xanh đậm.
+function Tip({ text, align = "center", tone, style, children }) {
+  const id = useId();
+  return (
+    <span className={`tip-wrap tip-${align}${tone === "light" ? " tip-light" : ""}`} style={style}>
+      {cloneElement(children, { "aria-describedby": id })}
+      <span role="tooltip" id={id} className="tip">{text}</span>
+    </span>
+  );
+}
+
 export default function TripPage() {
   const params = useParams();
   const code = params.code; // mã bí mật lấy từ URL
@@ -130,6 +143,7 @@ export default function TripPage() {
 
   const [tab, setTab] = useState("expenses");
   const [settingsOpen, setSettingsOpen] = useState(false); // modal Cài đặt
+  const [helpOpen, setHelpOpen] = useState(false);         // modal Trợ giúp (hướng dẫn dùng app)
   const [tripNameInput, setTripNameInput] = useState("");   // ô sửa tên chuyến trong modal
   const [tripNameSaved, setTripNameSaved] = useState(false);
   const [memberModal, setMemberModal] = useState(null); // null | { mode: "add" } | { mode: "rename", id, oldName }
@@ -267,10 +281,11 @@ export default function TripPage() {
       else if (loginPrompt) setLoginPrompt(false);
       else if (memberModal) setMemberModal(null);
       else if (settingsOpen) { setSettingsOpen(false); setRatesDraft(null); setCurError(""); }
+      else if (helpOpen) setHelpOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [qrView, deleteTarget, deleting, loginPrompt, memberModal, settingsOpen, sheetOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [qrView, deleteTarget, deleting, loginPrompt, memberModal, settingsOpen, sheetOpen, helpOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tấm nhập đang mở thì khóa cuộn trang phía sau; mở để thêm mới thì đưa con trỏ vào ô tên
   const sheetNameRef = useRef(null);
@@ -666,28 +681,49 @@ export default function TripPage() {
               <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt(totalVND)}</div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-            <button onClick={toggleSave}
-              style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: saved ? C.tealDark : "#fff", borderRadius: 999, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-              {saved ? "Đã lưu" : "Lưu chuyến"}
-            </button>
-            <button onClick={copyLink}
-              style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", border: "none", color: copied ? C.tealDark : "#fff", borderRadius: 999, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-              {copied ? "Đã copy link" : "Mời bạn"}
-            </button>
-            <button onClick={openSettings}
-              style={{ background: "rgba(255,255,255,.15)", border: "none", color: "#fff", borderRadius: 999, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-              Cài đặt
-            </button>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+            <Tip tone="light" align="start" text="Copy link chuyến đi để gửi vào group chat. Ai có link đều xem và nhập khoản chi được, không cần tài khoản.">
+              <button onClick={copyLink}
+                style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", color: copied ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+                {copied ? "Đã copy" : "Mời bạn"}
+              </button>
+            </Tip>
+            <Tip tone="light" text="Đổi tên chuyến, thêm hoặc sửa tên thành viên, chọn bạn là ai, và chỉnh tỉ giá ngoại tệ.">
+              <button onClick={openSettings}
+                style={{ background: "rgba(255,255,255,.15)", color: "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+                Cài đặt
+              </button>
+            </Tip>
+            {/* Lưu chuyến vào tài khoản Google, để mở lại từ trang chủ trên máy khác */}
+            <Tip tone="light" align="end" text={saved
+              ? "Chuyến này đã nằm trong tài khoản Google của bạn, mở lại được từ trang chủ trên mọi máy. Bấm lần nữa để bỏ lưu."
+              : "Đăng nhập Google để lưu chuyến vào tài khoản, rồi mở lại từ trang chủ trên máy khác. Không bắt buộc."}>
+              <button onClick={toggleSave}
+                style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", color: saved ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+                {saved ? "Đã lưu" : "Lưu chuyến đi"}
+              </button>
+            </Tip>
+            <Tip tone="light" align="end" text="Hướng dẫn dùng app: nhập khoản chi, trả nợ, xem ai chuyển cho ai và ý nghĩa từng nút.">
+              <button onClick={() => setHelpOpen(true)}
+                style={{ background: "rgba(255,255,255,.15)", color: "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+                Trợ giúp
+              </button>
+            </Tip>
           </div>
         </div>
       </header>
 
       {/* ===== TABS ===== */}
       <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", boxShadow: "0 1px 0 rgba(2,48,71,.08)", background: C.paper, position: "sticky", top: 0, zIndex: 5 }}>
-        <button className={`tabbtn ${tab === "expenses" ? "on" : ""}`} onClick={() => setTab("expenses")}>Sổ chi tiêu ({entries.length})</button>
-        <button className={`tabbtn ${tab === "summary" ? "on" : ""}`} onClick={() => { setTab("summary"); load(); }}>Tổng kết</button>
-        <button className={`tabbtn ${tab === "matrix" ? "on" : ""}`} onClick={() => { setTab("matrix"); load(); }}>Bảng chia</button>
+        <Tip align="start" style={{ flex: 1 }} text="Danh sách mọi khoản chi và trả nợ của chuyến. Bấm một khoản để sửa hoặc xóa.">
+          <button className={`tabbtn ${tab === "expenses" ? "on" : ""}`} onClick={() => setTab("expenses")}>Sổ chi tiêu ({entries.length})</button>
+        </Tip>
+        <Tip style={{ flex: 1 }} text="Ai cần chuyển cho ai bao nhiêu, kèm mã QR để quét trả, và chi phí của từng người.">
+          <button className={`tabbtn ${tab === "summary" ? "on" : ""}`} onClick={() => { setTab("summary"); load(); }}>Tổng kết</button>
+        </Tip>
+        <Tip align="end" style={{ flex: 1 }} text="Bảng chi tiết mỗi khoản chia cho từng người, để cả nhóm kiểm tra lại trước khi chuyển tiền.">
+          <button className={`tabbtn ${tab === "matrix" ? "on" : ""}`} onClick={() => { setTab("matrix"); load(); }}>Bảng chia</button>
+        </Tip>
       </div>
 
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "18px 16px 110px" }}>
@@ -1256,11 +1292,15 @@ export default function TripPage() {
               </button>
             </div>
             <div>
-              <div role="tablist" aria-label="Loại khoản" style={{ display: "flex", marginBottom: 14, borderRadius: 10, overflow: "hidden" }}>
+              <div role="tablist" aria-label="Loại khoản" style={{ display: "flex", marginBottom: 14 }}>
+                <Tip align="start" style={{ flex: 1 }} text="Một khoản tiền tiêu chung, ví dụ ăn uống, khách sạn, vé. Chọn ai trả và chia cho những ai.">
                 <button type="button" role="tab" aria-selected={fType === "expense"} className={`typebtn ${fType === "expense" ? "on" : ""}`} style={{ borderRadius: "10px 0 0 10px" }}
                   onClick={() => setFType("expense")}>Khoản chi</button>
+                </Tip>
+                <Tip align="end" style={{ flex: 1 }} text="Khi một người chuyển tiền lại cho người khác để trả nợ. Không tính vào chi phí chuyến đi.">
                 <button type="button" role="tab" aria-selected={fType === "transfer"} className={`typebtn ${fType === "transfer" ? "on" : ""}`} style={{ borderRadius: "0 10px 10px 0" }}
                   onClick={() => setFType("transfer")}>Trả nợ</button>
+                </Tip>
               </div>
 
               {fType === "expense" ? (
@@ -1372,6 +1412,90 @@ export default function TripPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Trợ giúp: hướng dẫn đầy đủ, mở từ nút Trợ giúp trên header */}
+      {helpOpen && (() => {
+        const steps = [
+          { title: "Mời cả nhóm", items: [
+            "Bấm Mời bạn để copy link chuyến đi, rồi dán vào group chat (Zalo, Messenger...).",
+            "Ai có link đều xem và nhập được, không cần tạo tài khoản.",
+            "Lần đầu mở link, chọn tên của bạn. App sẽ điền sẵn bạn là người trả và đưa phần của bạn lên đầu. Đổi lại được trong Cài đặt.",
+          ] },
+          { title: "Nhập khoản chi", items: [
+            "Bấm Thêm khoản chi ở cuối màn hình. Mỗi người tự nhập khoản mình đã trả.",
+            "Điền tên khoản, số tiền, ai trả. Mặc định chia đều cho cả nhóm, bấm vào tên để bỏ người không tham gia.",
+            "Trả bằng ngoại tệ? Chọn loại tiền ở ô Tiền. Thêm tiền tệ và tỉ giá trong Cài đặt.",
+            "Đánh dấu Chi trước chuyến đi cho tiền cọc, vé mua trước. Chỉ để gom riêng, không đổi cách chia.",
+            "Nhập sai? Bấm vào khoản đó trong Sổ chi tiêu để sửa hoặc xóa.",
+          ] },
+          { title: "Trả nợ giữa các thành viên", items: [
+            "Khi A chuyển tiền lại cho B, mở Thêm khoản chi, chọn Trả nợ, chọn người trả và người nhận.",
+            "Trả nợ không tính vào chi phí chuyến đi, chỉ làm số dư của hai người thay đổi.",
+            "Nếu A trả hộ một khoản cho B (vd tiền phòng), hãy nhập là Khoản chi: A trả, chia cho B.",
+          ] },
+          { title: "Cuối chuyến", items: [
+            "Mở Tổng kết. Ngay trên cùng là phần của bạn: cần chuyển cho ai bao nhiêu, hoặc được nhận lại bao nhiêu.",
+            "Người được nhận tiền nên thêm mã QR ngân hàng (chụp màn hình mã QR nhận tiền trong app ngân hàng).",
+            "Người trả bấm Quét QR để chuyển. Luôn kiểm tra tên chủ tài khoản trong app ngân hàng trước khi chuyển.",
+            "Muốn kiểm tra kỹ từng khoản? Mở Bảng chia để xem mỗi khoản chia cho từng người bao nhiêu.",
+          ] },
+        ];
+        const buttons = [
+          ["Mời bạn", "Copy link chuyến đi để gửi cho cả nhóm."],
+          ["Cài đặt", "Đổi tên chuyến, thêm hoặc sửa tên thành viên, chọn bạn là ai, tỉ giá ngoại tệ."],
+          ["Lưu chuyến đi", "Không bắt buộc. Đăng nhập Google để mở lại chuyến từ trang chủ trên máy khác. Trên máy này, trang chủ đã tự nhớ các chuyến bạn mở gần đây."],
+        ];
+        return (
+          <div onClick={() => setHelpOpen(false)}
+            style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, cursor: "pointer", padding: 16 }}>
+            <div role="dialog" aria-modal="true" aria-labelledby="help-title" onClick={(e) => e.stopPropagation()}
+              style={{ background: "#fff", borderRadius: 18, padding: 22, maxWidth: 480, width: "100%", maxHeight: "85dvh", overflowY: "auto", cursor: "default" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <h2 id="help-title" style={{ fontWeight: 800, fontSize: 18, color: C.ink }}>Hướng dẫn dùng TripSplit</h2>
+                <button onClick={() => setHelpOpen(false)} aria-label="Đóng hướng dẫn"
+                  style={{ border: "none", background: "none", color: C.text2, cursor: "pointer", padding: 6, margin: -6, display: "flex" }}><X size={20} weight="bold" /></button>
+              </div>
+              <p style={{ fontSize: 13.5, color: C.text2, lineHeight: 1.5, marginBottom: 6 }}>
+                Cả nhóm cùng nhập khoản chi qua một link chung. Cuối chuyến, app tính ai chuyển cho ai bao nhiêu, với ít lần chuyển khoản nhất.
+              </p>
+
+              {steps.map((sec, si) => (
+                <section key={sec.title} style={{ marginTop: 18 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 800, color: C.ink, display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 999, background: C.coral, color: C.ink, fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{si + 1}</span>
+                    {sec.title}
+                  </h3>
+                  <ul style={{ listStyle: "none", display: "grid", gap: 6, paddingLeft: 30 }}>
+                    {sec.items.map((t) => (
+                      <li key={t} style={{ fontSize: 13.5, lineHeight: 1.5, color: C.ink, position: "relative" }}>
+                        <span aria-hidden="true" style={{ position: "absolute", left: -14, top: 8, width: 5, height: 5, borderRadius: 9, background: C.text2 }} />
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+
+              <section style={{ marginTop: 20, background: "#F3F8FB", borderRadius: 12, padding: "12px 14px" }}>
+                <h3 style={{ fontSize: 14, fontWeight: 800, color: C.ink, marginBottom: 8 }}>Các nút trên cùng</h3>
+                <dl style={{ display: "grid", gap: 8 }}>
+                  {buttons.map(([name, desc]) => (
+                    <div key={name}>
+                      <dt style={{ fontSize: 13.5, fontWeight: 700, color: C.ink }}>{name}</dt>
+                      <dd style={{ fontSize: 13, color: C.text2, lineHeight: 1.5 }}>{desc}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+
+              <button onClick={() => setHelpOpen(false)}
+                style={{ marginTop: 18, width: "100%", padding: 12, background: C.coral, color: C.ink, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal Cài đặt: gộp sửa tên chuyến, quản lý thành viên, và tỉ giá vào một chỗ */}
       {settingsOpen && (
