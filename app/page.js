@@ -24,6 +24,7 @@ export default function HomePage() {
   const [memberNames, setMemberNames] = useState(["", ""]); // bắt đầu với 2 ô tên
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState("");
+  const [errDetail, setErrDetail] = useState("");
 
   // ---- Admin ----
   const [session, setSession] = useState(null);
@@ -55,11 +56,11 @@ export default function HomePage() {
   }
 
   async function createTrip() {
-    setErr("");
+    setErr(""); setErrDetail("");
     const names = memberNames.map((n) => n.trim()).filter(Boolean);
-    if (!tripName.trim()) { setErr("Đặt tên chuyến đi đã nha"); return; }
-    if (names.length < 2) { setErr("Cần ít nhất 2 thành viên mới có gì để chia 😄"); return; }
-    if (new Set(names).size !== names.length) { setErr("Có 2 người trùng tên — thêm ký tự phân biệt nhé (vd Minh A, Minh B)"); return; }
+    if (!tripName.trim()) { setErr("Nhập tên chuyến đi."); return; }
+    if (names.length < 2) { setErr("Cần ít nhất 2 người để chia tiền."); return; }
+    if (new Set(names).size !== names.length) { setErr("Có hai người trùng tên. Thêm chữ để phân biệt, ví dụ Minh A và Minh B."); return; }
 
     setCreating(true);
     const { data, error } = await supabase.rpc("create_trip", {
@@ -69,7 +70,9 @@ export default function HomePage() {
     setCreating(false);
 
     if (error || !data?.code) {
-      setErr("Tạo chuyến bị lỗi: " + (error?.message || "không rõ nguyên nhân"));
+      if (error) console.error(error);
+      setErr("Chưa tạo được chuyến. Thử lại sau vài giây.");
+      setErrDetail(error?.message ? String(error.message).slice(0, 140) : "");
       return;
     }
     // Đang đăng nhập thì tự lưu chuyến vừa tạo vào tài khoản luôn
@@ -126,7 +129,7 @@ export default function HomePage() {
           Đi chơi cứ vui,<br />tiền nong để app tính
         </div>
         <div style={{ fontSize: 14, opacity: 0.85, marginTop: 10, maxWidth: 420, margin: "10px auto 0" }}>
-          Cả nhóm cùng nhập khoản chi qua 1 link chung — kết thúc chuyến, app chốt ai chuyển ai bao nhiêu.
+          Cả nhóm cùng nhập khoản chi qua một link chung. Cuối chuyến, app tính ai chuyển cho ai bao nhiêu.
         </div>
       </div>
 
@@ -156,6 +159,7 @@ export default function HomePage() {
                 <button
                   onClick={() => setMemberNames((prev) => prev.filter((_, idx) => idx !== i))}
                   style={{ background: "#EDF5FA", border: "none", borderRadius: 10, padding: "0 14px", cursor: "pointer", color: "#9aa6ab" }}
+                  aria-label="Xóa người này"
                 >✕</button>
               )}
             </div>
@@ -164,21 +168,26 @@ export default function HomePage() {
           <button
             onClick={() => setMemberNames((prev) => [...prev, ""])}
             style={{ background: "#EDF5FA", border: "none", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: 13.5, color: C.tealDark, fontWeight: 600, marginBottom: 16, width: "100%" }}
-          >＋ Thêm thành viên</button>
+          >Thêm thành viên</button>
 
-          {err && <div style={{ fontSize: 13, color: "#FB8500", marginBottom: 12 }}>⚠ {err}</div>}
+          {err && (
+            <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginBottom: 12 }}>
+              {err}
+              {errDetail && <div style={{ fontSize: 11.5, marginTop: 3, wordBreak: "break-word" }}>{errDetail}</div>}
+            </div>
+          )}
 
           <button
             onClick={createTrip}
             disabled={creating}
             style={{ width: "100%", padding: 13, background: creating ? "#FB8500" : C.coral, color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: creating ? "wait" : "pointer" }}
           >
-            {creating ? "Đang tạo chuyến..." : "Tạo chuyến & lấy link share"}
+            {creating ? "Đang tạo chuyến..." : "Tạo chuyến"}
           </button>
 
           <div style={{ fontSize: 12, color: "#9aa6ab", marginTop: 12, lineHeight: 1.5 }}>
-            Tạo xong m sẽ nhận được 1 link bí mật — gửi vào group chat là cả nhóm vào nhập chung được.
-            Ai có link mới thấy chuyến đi, mỗi chuyến một thế giới riêng.
+            Tạo xong, chuyến có một link riêng. Gửi link vào group chat là cả nhóm vào nhập được.
+            Chỉ người có link mới xem được chuyến.
           </div>
         </div>
 
@@ -188,12 +197,12 @@ export default function HomePage() {
             <div style={{ textAlign: "center" }}>
               <button
                 onClick={loginGoogle}
-                style={{ background: "#EDF5FA", border: "none", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 999, padding: "9px 22px", cursor: "pointer", fontSize: 13, color: C.tealDark, fontWeight: 600 }}
+                style={{ background: "#EDF5FA", border: "none", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 999, padding: "12px 22px", cursor: "pointer", fontSize: 14, color: C.tealDark, fontWeight: 600, whiteSpace: "nowrap" }}
               >
                 Đăng nhập với Google
               </button>
               <div style={{ fontSize: 12, color: "#9aa6ab", marginTop: 8 }}>
-                Để lưu và xem lại các chuyến đi của bạn — không bắt buộc, vào bằng link vẫn vô tư
+                Đăng nhập để lưu và xem lại các chuyến của bạn. Không bắt buộc, vào bằng link vẫn dùng được.
               </div>
             </div>
           ) : (
@@ -202,7 +211,7 @@ export default function HomePage() {
                 <div style={{ fontWeight: 800, fontSize: 16 }}>Chuyến đi của tôi</div>
                 <button
                   onClick={() => supabase.auth.signOut()}
-                  style={{ border: "none", background: "none", color: "#9aa6ab", fontSize: 12.5, cursor: "pointer" }}
+                  style={{ border: "none", background: "none", color: "#5d6d77", fontSize: 13.5, padding: "8px 0", cursor: "pointer" }}
                 >Đăng xuất</button>
               </div>
 
@@ -210,8 +219,7 @@ export default function HomePage() {
 
               {myTrips !== null && myTrips.length === 0 && (
                 <div style={{ fontSize: 13.5, color: "#7d8a90", lineHeight: 1.6 }}>
-                  Chưa có chuyến nào trong tài khoản. Tạo chuyến mới, hoặc mở một chuyến từ link bạn bè gửi
-                  rồi bấm "Lưu chuyến" trên đó — nó sẽ xuất hiện ở đây.
+                  Chưa có chuyến nào. Tạo chuyến mới, hoặc mở link bạn bè gửi rồi bấm Lưu chuyến, chuyến đó sẽ hiện ở đây.
                 </div>
               )}
 
