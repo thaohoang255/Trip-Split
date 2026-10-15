@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { ArrowRight, CaretRight, Check, Plus, Scan, Trash, X } from "@phosphor-icons/react";
 import { supabase } from "../../../lib/supabase";
 import { toVND, computeBalances, fmt } from "../../../lib/money";
+import { useWide } from "../../../lib/useWide";
 
 // ============================================================
 // TRANG CHUYẾN ĐI — /trip/[code]
@@ -130,6 +131,7 @@ function Tip({ text, align = "center", tone, style, children }) {
 
 export default function TripPage() {
   const params = useParams();
+  const wide = useWide();
   const code = params.code; // mã bí mật lấy từ URL
 
   // ---- Dữ liệu chuyến đi tải từ Supabase ----
@@ -266,6 +268,7 @@ export default function TripPage() {
     else if (stored !== "skip") setAskWho(true);
     const start = found || members[0];
     setFPayer(start.id);
+    setFParts(members.map((m) => m.id));
     setFReceiver((members.find((m) => m.id !== start.id) || start).id);
     setShowTips(tipsDone !== "done");
     setMeChecked(true);
@@ -290,12 +293,12 @@ export default function TripPage() {
   // Tấm nhập đang mở thì khóa cuộn trang phía sau; mở để thêm mới thì đưa con trỏ vào ô tên
   const sheetNameRef = useRef(null);
   useEffect(() => {
-    if (!sheetOpen) return;
+    if (!sheetOpen || wide) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     if (!editingId) setTimeout(() => sheetNameRef.current?.focus(), 220);
     return () => { document.body.style.overflow = prev; };
-  }, [sheetOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sheetOpen, wide]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sửa form thì xóa lời nhắc cũ
   useEffect(() => { setFormError(""); }, [fName, fAmount, fParts, fPayer, fReceiver, fType]);
@@ -389,7 +392,7 @@ export default function TripPage() {
 
     setEditingId(null);
     setFName(""); setFAmount(""); setFPrepaid(false);
-    setFParts([]);
+    setFParts(members.map((m) => m.id));
     setSheetOpen(false);
     load();
   }
@@ -434,7 +437,7 @@ export default function TripPage() {
   function cancelEdit() {
     setEditingId(null);
     setFName(""); setFAmount(""); setFPrepaid(false);
-    setFParts([]);
+    setFParts(members.map((m) => m.id));
   }
 
   // Mở modal thêm thành viên mới (vd: có thêm bạn rủ đi sau khi đã tạo chuyến)
@@ -630,6 +633,127 @@ export default function TripPage() {
   const sectionHead = { fontSize: 16, fontWeight: 800, color: C.ink, margin: "26px 0 10px" };
   const settingsHead = { fontSize: 13.5, fontWeight: 700, color: C.ink, marginBottom: 8 };
 
+  // Form nhập / sửa khoản dùng chung: trong tấm trượt (điện thoại) hoặc khung bên phải (máy tính)
+  const entryForm = (
+            <div>
+              <div role="tablist" aria-label="Loại khoản" style={{ display: "flex", marginBottom: 14 }}>
+                <Tip align="start" style={{ flex: 1 }} text="Một khoản tiền tiêu chung, ví dụ ăn uống, khách sạn, vé. Chọn ai trả và chia cho những ai.">
+                <button type="button" role="tab" aria-selected={fType === "expense"} className={`typebtn ${fType === "expense" ? "on" : ""}`} style={{ borderRadius: "10px 0 0 10px" }}
+                  onClick={() => setFType("expense")}>Khoản chi</button>
+                </Tip>
+                <Tip align="end" style={{ flex: 1 }} text="Khi một người chuyển tiền lại cho người khác để trả nợ. Không tính vào chi phí chuyến đi.">
+                <button type="button" role="tab" aria-selected={fType === "transfer"} className={`typebtn ${fType === "transfer" ? "on" : ""}`} style={{ borderRadius: "0 10px 10px 0" }}
+                  onClick={() => setFType("transfer")}>Trả nợ</button>
+                </Tip>
+              </div>
+
+              {fType === "expense" ? (
+                <>
+                  <label htmlFor="f-name" style={fieldLabel}>Tên khoản chi</label>
+                  <input id="f-name" ref={sheetNameRef} className="inp" placeholder="vd: Ăn trưa ngày 3" value={fName}
+                    onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 12 }} />
+
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.3fr) 88px minmax(0,1fr)", gap: 8, marginBottom: 12 }}>
+                    <div>
+                      <label htmlFor="f-amount" style={fieldLabel}>Số tiền</label>
+                      <input id="f-amount" className="inp" type="text" inputMode="decimal" placeholder="0" value={fAmount}
+                        onChange={(e) => setFAmount(formatAmountInput(e.target.value, fAmount, e.nativeEvent?.data, fCurrency !== "VND"))} />
+                    </div>
+                    <div>
+                      <label htmlFor="f-currency" style={fieldLabel}>Tiền</label>
+                      <select id="f-currency" className="inp" value={fCurrency} onChange={(e) => changeCurrency(e.target.value)}>
+                        {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="f-payer" style={fieldLabel}>Ai trả</label>
+                      <select id="f-payer" className="inp" value={fPayer} onChange={(e) => setFPayer(e.target.value)}>
+                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div id="f-parts-label" style={fieldLabel}>Chia cho ai <span style={{ fontWeight: 400, color: C.text2 }}>· chọn từng người hoặc Cả nhóm</span></div>
+                  <div role="group" aria-labelledby="f-parts-label" style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+                    {members.map((m) => {
+                      const on = fParts.includes(m.id);
+                      return (
+                        <button type="button" key={m.id} aria-pressed={on} className={`chip ${on ? "on" : ""}`}
+                          onClick={() => setFParts((prev) => prev.includes(m.id) ? prev.filter((p) => p !== m.id) : [...prev, m.id])}>
+                          {on && <Check size={13} weight="bold" aria-hidden="true" />}{m.name}
+                        </button>
+                      );
+                    })}
+                    {(() => {
+                      const allOn = allIds.length > 0 && fParts.length === allIds.length;
+                      return (
+                        <button type="button" aria-pressed={allOn} className={`chip ${allOn ? "on" : ""}`}
+                          onClick={() => setFParts(allOn ? [] : allIds)}>
+                          {allOn && <Check size={13} weight="bold" aria-hidden="true" />}Cả nhóm
+                        </button>
+                      );
+                    })()}
+                  </div>
+
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13.5, marginBottom: 14, cursor: "pointer", lineHeight: 1.45 }}>
+                    <input type="checkbox" checked={fPrepaid} onChange={(e) => setFPrepaid(e.target.checked)}
+                      style={{ marginTop: 2, width: 18, height: 18, flexShrink: 0, accentColor: C.ink }} />
+                    <span>
+                      Chi trước chuyến đi (đặt cọc, mua vé trước)
+                      <br /><span style={{ fontSize: 12, color: C.text2 }}>Chỉ để gắn nhãn và gom riêng ở tab Tổng kết, không đổi cách chia tiền.</span>
+                    </span>
+                  </label>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)", gap: 8, alignItems: "end", marginBottom: 12 }}>
+                    <div>
+                      <label htmlFor="t-from" style={fieldLabel}>Người trả</label>
+                      <select id="t-from" className="inp" value={fPayer} onChange={(e) => setFPayer(e.target.value)}>
+                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <ArrowRight size={18} color={C.text2} aria-hidden="true" style={{ marginBottom: 11 }} />
+                    <div>
+                      <label htmlFor="t-to" style={fieldLabel}>Người nhận</label>
+                      <select id="t-to" className="inp" value={fReceiver} onChange={(e) => setFReceiver(e.target.value)}>
+                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 88px", gap: 8, marginBottom: 12 }}>
+                    <div>
+                      <label htmlFor="t-amount" style={fieldLabel}>Số tiền</label>
+                      <input id="t-amount" className="inp" type="text" inputMode="decimal" placeholder="0" value={fAmount}
+                        onChange={(e) => setFAmount(formatAmountInput(e.target.value, fAmount, e.nativeEvent?.data, fCurrency !== "VND"))} />
+                    </div>
+                    <div>
+                      <label htmlFor="t-currency" style={fieldLabel}>Tiền</label>
+                      <select id="t-currency" className="inp" value={fCurrency} onChange={(e) => changeCurrency(e.target.value)}>
+                        {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <label htmlFor="t-note" style={fieldLabel}>Ghi chú <span style={{ fontWeight: 400, color: C.text2 }}>(không bắt buộc)</span></label>
+                  <input id="t-note" className="inp" placeholder="vd: Duyên trả lại tiền ăn tối" value={fName}
+                    onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 14 }} />
+                  <div style={{ fontSize: 12, color: C.text2, background: "#F3F8FB", borderRadius: 10, padding: "8px 12px", marginBottom: 14, lineHeight: 1.5 }}>
+                    Dùng khi A đưa tiền lại cho B để trả nợ. Khoản này không tính vào chi phí.
+                    Nếu A trả hộ một khoản chi cho B (vd tiền homestay), nhập ở tab Khoản chi: A trả, chia cho B.
+                  </div>
+                </>
+              )}
+
+              {formError && (
+                <div role="alert" style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{formError}</div>
+              )}
+              <button type="button" onClick={addEntry} disabled={busy}
+                style={{ width: "100%", padding: 12, background: busy ? "#c4ccd0" : (fType === "expense" ? C.coral : C.purple), color: fType === "expense" || busy ? C.ink : "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer" }}>
+                {busy ? "Đang lưu..." : editingId ? "Cập nhật khoản này" : (fType === "expense" ? "Lưu khoản chi" : "Ghi nhận trả nợ")}
+              </button>
+            </div>
+  );
+
   return (
     <div style={{ minHeight: "100vh", background: C.paper, color: C.ink }}>
       <style>{`
@@ -644,6 +768,7 @@ export default function TripPage() {
         .receipt { background:#fff; border-radius:14px; position:relative; box-shadow:0 1px 3px rgba(2,48,71,.08); }
         .receipt:before { content:""; position:absolute; top:-7px; left:0; right:0; height:14px;
           background:radial-gradient(circle at 8px 0px, transparent 7px, #fff 7.5px); background-size:18px 14px; }
+        .tabs-wide .tabbtn { padding-left:18px; padding-right:18px; }
         .tabbtn { flex:1; padding:11px 0; border:none; background:transparent; font-size:14px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; color:${C.text2}; }
         .tabbtn.on { color:${C.tealDark}; border-bottom-color:${C.coral}; }
         .typebtn { flex:1; padding:11px 0; border:none; background:#EDF5FA; font-size:13.5px; font-weight:600; cursor:pointer; color:${C.text2}; }
@@ -659,7 +784,7 @@ export default function TripPage() {
           Gọn lại để danh sách khoản chi hiện ngay màn hình đầu: tên chuyến bên trái,
           "cuống vé" tổng chi bên phải, hàng nút bên dưới. Danh sách thành viên đầy đủ nằm ở Cài đặt. */}
       <header style={{ background: C.tealDark, color: "#fff", padding: "12px 16px 14px" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
+        <div style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
             <div style={{ minWidth: 0 }}>
               <a href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: "4px 0" }}>
@@ -714,29 +839,30 @@ export default function TripPage() {
       </header>
 
       {/* ===== TABS ===== */}
-      <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", boxShadow: "0 1px 0 rgba(2,48,71,.08)", background: C.paper, position: "sticky", top: 0, zIndex: 5 }}>
-        <Tip align="start" style={{ flex: 1 }} text="Danh sách mọi khoản chi và trả nợ của chuyến. Bấm một khoản để sửa hoặc xóa.">
+      <div className={wide ? "tabs-wide" : undefined} style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto", padding: wide ? "0 16px" : 0, display: "flex", boxShadow: "0 1px 0 rgba(2,48,71,.08)", background: C.paper, position: "sticky", top: 0, zIndex: 5 }}>
+        <Tip align="start" style={{ flex: wide ? "0 0 auto" : 1 }} text="Danh sách mọi khoản chi và trả nợ của chuyến. Bấm một khoản để sửa hoặc xóa.">
           <button className={`tabbtn ${tab === "expenses" ? "on" : ""}`} onClick={() => setTab("expenses")}>Sổ chi tiêu ({entries.length})</button>
         </Tip>
-        <Tip style={{ flex: 1 }} text="Ai cần chuyển cho ai bao nhiêu, kèm mã QR để quét trả, và chi phí của từng người.">
+        <Tip style={{ flex: wide ? "0 0 auto" : 1 }} text="Ai cần chuyển cho ai bao nhiêu, kèm mã QR để quét trả, và chi phí của từng người.">
           <button className={`tabbtn ${tab === "summary" ? "on" : ""}`} onClick={() => { setTab("summary"); load(); }}>Tổng kết</button>
         </Tip>
-        <Tip align="end" style={{ flex: 1 }} text="Bảng chi tiết mỗi khoản chia cho từng người, để cả nhóm kiểm tra lại trước khi chuyển tiền.">
+        <Tip align={wide ? "center" : "end"} style={{ flex: wide ? "0 0 auto" : 1 }} text="Bảng chi tiết mỗi khoản chia cho từng người, để cả nhóm kiểm tra lại trước khi chuyển tiền.">
           <button className={`tabbtn ${tab === "matrix" ? "on" : ""}`} onClick={() => { setTab("matrix"); load(); }}>Bảng chia</button>
         </Tip>
       </div>
 
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "18px 16px 110px" }}>
+      <div style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto", padding: wide ? "20px 16px 60px" : "18px 16px 110px" }}>
 
         {/* ============ TAB 1: SỔ CHI TIÊU ============ */}
         {tab === "expenses" && (
-          <>
+          <div style={wide ? { display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(0,1fr)", gap: 24, alignItems: "start" } : undefined}>
+          <div>
             {showTips && !askWho && (
               <div style={{ background: "#F3F8FB", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: C.ink, marginBottom: 8 }}>Cách dùng</div>
                 {[
                   "Chưa gửi link cho cả nhóm thì bấm Mời bạn ở trên để copy link, rồi dán vào group chat.",
-                  "Ai trả tiền gì thì bấm Thêm khoản chi ở cuối màn hình. Mỗi người tự nhập khoản mình đã trả.",
+                  wide ? "Ai trả tiền gì thì nhập ở khung bên phải. Mỗi người tự nhập khoản mình đã trả." : "Ai trả tiền gì thì bấm Thêm khoản chi ở cuối màn hình. Mỗi người tự nhập khoản mình đã trả.",
                   "Cuối chuyến, vào tab Tổng kết để xem ai chuyển cho ai. Thêm mã QR ngân hàng của bạn ở đó để người khác quét trả.",
                 ].map((t, i) => (
                   <div key={i} style={{ display: "grid", gridTemplateColumns: "22px 1fr", fontSize: 13.5, lineHeight: 1.5, color: C.text2, marginBottom: 6 }}>
@@ -781,7 +907,7 @@ export default function TripPage() {
             </div>
 
             {entries.length > 0 && (
-              <div style={{ fontSize: 12.5, color: C.text2, margin: "0 2px 8px" }}>Bấm vào một khoản để sửa hoặc xóa.</div>
+              <div style={{ fontSize: 12.5, color: C.text2, margin: "0 2px 8px" }}>{wide ? "Bấm vào một khoản để sửa hoặc xóa ở khung bên phải." : "Bấm vào một khoản để sửa hoặc xóa."}</div>
             )}
             {[...entries].reverse().map((e) => {
               const vnd = toVND(e.amount, e.currency, rates);
@@ -826,15 +952,37 @@ export default function TripPage() {
             })}
             {entries.length === 0 && (
               <div style={{ textAlign: "center", color: C.text2, fontSize: 14, padding: "8px 0" }}>
-                Chưa có khoản nào. Bấm Thêm khoản chi ở dưới để nhập khoản đầu tiên.
+                {wide ? "Chưa có khoản nào. Nhập khoản đầu tiên ở khung bên phải." : "Chưa có khoản nào. Bấm Thêm khoản chi ở dưới để nhập khoản đầu tiên."}
               </div>
             )}
-          </>
+          </div>
+          {wide && (
+            // Máy tính: form luôn mở bên phải, bấm một khoản bên trái để nạp vào đây mà sửa
+            <aside aria-labelledby="panel-title"
+              style={{ position: "sticky", top: 60, background: editingId ? "#FFF9F2" : "#fff", borderRadius: 14, boxShadow: editingId ? `0 0 0 2px ${C.coral}, 0 4px 16px rgba(2,48,71,.10)` : "0 4px 16px rgba(2,48,71,.10)", padding: 18, maxHeight: "calc(100vh - 80px)", overflowY: "auto" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                <h2 id="panel-title" style={{ flex: 1, fontSize: 17, fontWeight: 800, color: C.ink }}>{editingId ? "Sửa khoản đã nhập" : "Thêm khoản mới"}</h2>
+                {editingId && (
+                  <>
+                    <button type="button" onClick={() => setDeleteTarget(entries.find((x) => x.id === editingId))}
+                      style={{ border: "none", background: "none", color: C.orangeText, cursor: "pointer", fontSize: 13.5, fontWeight: 700, padding: "8px 6px", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <Trash size={15} weight="bold" aria-hidden="true" />Xóa
+                    </button>
+                    <button type="button" onClick={cancelEdit}
+                      style={{ border: "none", background: "none", color: C.ink, cursor: "pointer", fontSize: 13.5, padding: "8px 6px", textDecoration: "underline" }}>Hủy</button>
+                  </>
+                )}
+              </div>
+              {entryForm}
+            </aside>
+          )}
+          </div>
         )}
 
         {/* ============ TAB 2: TỔNG KẾT ============ */}
         {tab === "summary" && (
-          <>
+          <div style={wide ? { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 28, alignItems: "start" } : undefined}>
+          <div>
             {/* "Phần của bạn": câu trả lời cuối chuyến (chuyển cho ai, bao nhiêu) nằm ngay đầu tab */}
             {(() => {
               const card = { background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 14, padding: 16, display: "grid", gap: 10 };
@@ -983,8 +1131,10 @@ export default function TripPage() {
               )}
             </div>
 
+          </div>
+          <div>
             {/* Chi phí THẬT mỗi người phải chịu cho chuyến (shareExp) — ai trả hộ cũng không đổi, chuyển tiền không tính */}
-            <h2 style={sectionHead}>Chi phí mỗi người</h2>
+            <h2 style={wide ? { ...sectionHead, marginTop: 0 } : sectionHead}>Chi phí mỗi người</h2>
             <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "14px 16px" }}>
               {[...members].sort((a, b) => detail[b.id].shareExp - detail[a.id].shareExp).map((m) => {
                 const cost = detail[m.id].shareExp;
@@ -1083,7 +1233,8 @@ export default function TripPage() {
                 <div style={{ fontWeight: 800, fontSize: 19, marginTop: 3 }}>{fmt(totalVND)}</div>
               </div>
             </div>
-          </>
+          </div>
+          </div>
         )}
 
         {/* ============ TAB 3: BẢNG CHIA — cả nhóm xem lại lần cuối trước khi chuyển tiền ============ */}
@@ -1133,10 +1284,11 @@ export default function TripPage() {
               {orderedMembers.map((m) => <th key={m.id} scope="col" style={{ ...thStyle, ...(m.id === meId ? { background: "#E8F4F9", borderRadius: 6 } : {}) }}>{m.name}</th>)}
             </tr>
           );
-          const tableStyle = { width: "100%", minWidth: 104 + members.length * 56, tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 3 };
+          const itemColW = wide ? 220 : 104; // cột tên khoản: máy tính đủ chỗ để tên nằm trên một dòng
+          const tableStyle = { width: "100%", minWidth: itemColW + members.length * 56, tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 3 };
           const cols = (
             <colgroup>
-              <col style={{ width: 104 }} />
+              <col style={{ width: itemColW }} />
               {orderedMembers.map((m) => <col key={m.id} />)}
             </colgroup>
           );
@@ -1261,7 +1413,7 @@ export default function TripPage() {
       </div>
 
       {/* Nút thêm khoản chi luôn nằm cuối màn hình ở tab Sổ chi tiêu */}
-      {tab === "expenses" && !sheetOpen && (
+      {tab === "expenses" && !sheetOpen && !wide && (
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 20, padding: "0 16px calc(14px + env(safe-area-inset-bottom, 0px))", pointerEvents: "none" }}>
           <button type="button" onClick={openAdd}
             style={{ pointerEvents: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", maxWidth: 608, margin: "0 auto", padding: 14, background: C.coral, color: C.ink, border: "none", borderRadius: 14, fontWeight: 800, fontSize: 15, cursor: "pointer", boxShadow: "0 6px 18px rgba(2,48,71,.22)" }}>
@@ -1270,8 +1422,8 @@ export default function TripPage() {
         </div>
       )}
 
-      {/* Tấm nhập / sửa khoản: trượt từ dưới lên, cả form và nút Lưu nằm gọn trong một màn hình */}
-      {sheetOpen && (
+      {/* Tấm nhập / sửa khoản: trượt từ dưới lên, cả form và nút Lưu nằm gọn trong một màn hình (chỉ điện thoại) */}
+      {sheetOpen && !wide && (
         <div className="scrim" onClick={closeSheet}
           style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.45)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" onClick={(e) => e.stopPropagation()}
@@ -1291,124 +1443,7 @@ export default function TripPage() {
                 <X size={16} weight="bold" />
               </button>
             </div>
-            <div>
-              <div role="tablist" aria-label="Loại khoản" style={{ display: "flex", marginBottom: 14 }}>
-                <Tip align="start" style={{ flex: 1 }} text="Một khoản tiền tiêu chung, ví dụ ăn uống, khách sạn, vé. Chọn ai trả và chia cho những ai.">
-                <button type="button" role="tab" aria-selected={fType === "expense"} className={`typebtn ${fType === "expense" ? "on" : ""}`} style={{ borderRadius: "10px 0 0 10px" }}
-                  onClick={() => setFType("expense")}>Khoản chi</button>
-                </Tip>
-                <Tip align="end" style={{ flex: 1 }} text="Khi một người chuyển tiền lại cho người khác để trả nợ. Không tính vào chi phí chuyến đi.">
-                <button type="button" role="tab" aria-selected={fType === "transfer"} className={`typebtn ${fType === "transfer" ? "on" : ""}`} style={{ borderRadius: "0 10px 10px 0" }}
-                  onClick={() => setFType("transfer")}>Trả nợ</button>
-                </Tip>
-              </div>
-
-              {fType === "expense" ? (
-                <>
-                  <label htmlFor="f-name" style={fieldLabel}>Tên khoản chi</label>
-                  <input id="f-name" ref={sheetNameRef} className="inp" placeholder="vd: Ăn trưa ngày 3" value={fName}
-                    onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 12 }} />
-
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.3fr) 88px minmax(0,1fr)", gap: 8, marginBottom: 12 }}>
-                    <div>
-                      <label htmlFor="f-amount" style={fieldLabel}>Số tiền</label>
-                      <input id="f-amount" className="inp" type="text" inputMode="decimal" placeholder="0" value={fAmount}
-                        onChange={(e) => setFAmount(formatAmountInput(e.target.value, fAmount, e.nativeEvent?.data, fCurrency !== "VND"))} />
-                    </div>
-                    <div>
-                      <label htmlFor="f-currency" style={fieldLabel}>Tiền</label>
-                      <select id="f-currency" className="inp" value={fCurrency} onChange={(e) => changeCurrency(e.target.value)}>
-                        {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="f-payer" style={fieldLabel}>Ai trả</label>
-                      <select id="f-payer" className="inp" value={fPayer} onChange={(e) => setFPayer(e.target.value)}>
-                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div id="f-parts-label" style={fieldLabel}>Chia cho ai <span style={{ fontWeight: 400, color: C.text2 }}>· chọn từng người hoặc Cả nhóm</span></div>
-                  <div role="group" aria-labelledby="f-parts-label" style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
-                    {members.map((m) => {
-                      const on = fParts.includes(m.id);
-                      return (
-                        <button type="button" key={m.id} aria-pressed={on} className={`chip ${on ? "on" : ""}`}
-                          onClick={() => setFParts((prev) => prev.includes(m.id) ? prev.filter((p) => p !== m.id) : [...prev, m.id])}>
-                          {on && <Check size={13} weight="bold" aria-hidden="true" />}{m.name}
-                        </button>
-                      );
-                    })}
-                    {(() => {
-                      const allOn = allIds.length > 0 && fParts.length === allIds.length;
-                      return (
-                        <button type="button" aria-pressed={allOn} className={`chip ${allOn ? "on" : ""}`}
-                          onClick={() => setFParts(allOn ? [] : allIds)}>
-                          {allOn && <Check size={13} weight="bold" aria-hidden="true" />}Cả nhóm
-                        </button>
-                      );
-                    })()}
-                  </div>
-
-                  <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13.5, marginBottom: 14, cursor: "pointer", lineHeight: 1.45 }}>
-                    <input type="checkbox" checked={fPrepaid} onChange={(e) => setFPrepaid(e.target.checked)}
-                      style={{ marginTop: 2, width: 18, height: 18, flexShrink: 0, accentColor: C.ink }} />
-                    <span>
-                      Chi trước chuyến đi (đặt cọc, mua vé trước)
-                      <br /><span style={{ fontSize: 12, color: C.text2 }}>Chỉ để gắn nhãn và gom riêng ở tab Tổng kết, không đổi cách chia tiền.</span>
-                    </span>
-                  </label>
-                </>
-              ) : (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)", gap: 8, alignItems: "end", marginBottom: 12 }}>
-                    <div>
-                      <label htmlFor="t-from" style={fieldLabel}>Người trả</label>
-                      <select id="t-from" className="inp" value={fPayer} onChange={(e) => setFPayer(e.target.value)}>
-                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                    </div>
-                    <ArrowRight size={18} color={C.text2} aria-hidden="true" style={{ marginBottom: 11 }} />
-                    <div>
-                      <label htmlFor="t-to" style={fieldLabel}>Người nhận</label>
-                      <select id="t-to" className="inp" value={fReceiver} onChange={(e) => setFReceiver(e.target.value)}>
-                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 88px", gap: 8, marginBottom: 12 }}>
-                    <div>
-                      <label htmlFor="t-amount" style={fieldLabel}>Số tiền</label>
-                      <input id="t-amount" className="inp" type="text" inputMode="decimal" placeholder="0" value={fAmount}
-                        onChange={(e) => setFAmount(formatAmountInput(e.target.value, fAmount, e.nativeEvent?.data, fCurrency !== "VND"))} />
-                    </div>
-                    <div>
-                      <label htmlFor="t-currency" style={fieldLabel}>Tiền</label>
-                      <select id="t-currency" className="inp" value={fCurrency} onChange={(e) => changeCurrency(e.target.value)}>
-                        {currencyList.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <label htmlFor="t-note" style={fieldLabel}>Ghi chú <span style={{ fontWeight: 400, color: C.text2 }}>(không bắt buộc)</span></label>
-                  <input id="t-note" className="inp" placeholder="vd: Duyên trả lại tiền ăn tối" value={fName}
-                    onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 14 }} />
-                  <div style={{ fontSize: 12, color: C.text2, background: "#F3F8FB", borderRadius: 10, padding: "8px 12px", marginBottom: 14, lineHeight: 1.5 }}>
-                    Dùng khi A đưa tiền lại cho B để trả nợ. Khoản này không tính vào chi phí.
-                    Nếu A trả hộ một khoản chi cho B (vd tiền homestay), nhập ở tab Khoản chi: A trả, chia cho B.
-                  </div>
-                </>
-              )}
-
-              {formError && (
-                <div role="alert" style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{formError}</div>
-              )}
-              <button type="button" onClick={addEntry} disabled={busy}
-                style={{ width: "100%", padding: 12, background: busy ? "#c4ccd0" : (fType === "expense" ? C.coral : C.purple), color: fType === "expense" || busy ? C.ink : "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer" }}>
-                {busy ? "Đang lưu..." : editingId ? "Cập nhật khoản này" : (fType === "expense" ? "Lưu khoản chi" : "Ghi nhận trả nợ")}
-              </button>
-            </div>
-
+            {entryForm}
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CaretRight, X } from "@phosphor-icons/react";
 import { supabase } from "../lib/supabase";
 import { computeBalances, fmt } from "../lib/money";
+import { useWide } from "../lib/useWide";
 
 // ============================================================
 // TRANG CHỦ
@@ -22,6 +23,7 @@ const C = {
 
 export default function HomePage() {
   const router = useRouter();
+  const wide = useWide();
 
   // ---- Form tạo chuyến ----
   const [tripName, setTripName] = useState("");
@@ -170,11 +172,14 @@ export default function HomePage() {
         )}
       </div>
 
-      <div style={{ maxWidth: 520, margin: "0 auto", padding: "26px 16px 60px" }}>
+      {/* Máy tính + có chuyến gần đây: chuyến gần đây (và danh sách admin) bên trái, form tạo chuyến bên phải */}
+      <div style={wide && recent.length > 0
+        ? { maxWidth: 1040, margin: "0 auto", padding: "28px 16px 60px", display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gridTemplateAreas: '"recent form" "admin form"', columnGap: 28, alignItems: "start" }
+        : { maxWidth: 520, margin: "0 auto", padding: "26px 16px 60px" }}>
 
         {/* ===== Chuyến gần đây: quay lại chuyến cũ không cần tìm link trong group chat ===== */}
         {recent.length > 0 && (
-          <section style={{ marginBottom: 22 }}>
+          <section style={{ marginBottom: 22, gridArea: "recent" }}>
             <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 10 }}>Chuyến gần đây trên máy này</h2>
             {recent.map((t) => {
               const owes = t.myNet !== null && t.myNet < -1;
@@ -199,7 +204,7 @@ export default function HomePage() {
         )}
 
         {/* ===== Form tạo chuyến đi ===== */}
-        <form onSubmit={(e) => { e.preventDefault(); createTrip(); }} style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 16, padding: 20 }}>
+        <form onSubmit={(e) => { e.preventDefault(); createTrip(); }} style={{ gridArea: "form", background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 16, padding: 20 }}>
           <h2 style={{ fontWeight: 800, fontSize: 17, marginBottom: 14 }}>Tạo chuyến đi mới</h2>
 
           <label htmlFor="trip-name" style={{ display: "block", fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Tên chuyến đi</label>
@@ -260,7 +265,7 @@ export default function HomePage() {
         </form>
 
         {/* ===== Khu vực admin ===== */}
-        <div style={{ marginTop: 28 }}>
+        <div style={{ marginTop: wide && recent.length > 0 ? 6 : 28, gridArea: "admin" }}>
           {!session ? (
             <div style={{ textAlign: "center" }}>
               <button
