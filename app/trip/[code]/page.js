@@ -636,7 +636,7 @@ export default function TripPage() {
   const currencyList = Object.keys(rates);
   const allIds = members.map((m) => m.id);
   const fieldLabel = { display: "block", fontSize: 12.5, fontWeight: 600, color: C.ink, marginBottom: 5 };
-  const sectionHead = { fontSize: 16, fontWeight: 800, color: C.ink, margin: "26px 0 10px" };
+  const sectionHead = { fontSize: 16, fontWeight: 800, color: C.ink, marginTop: 26, marginBottom: 10 }; // tách riêng để ghi đè marginTop không lẫn với shorthand
   const settingsHead = { fontSize: 13.5, fontWeight: 700, color: C.ink, marginBottom: 8 };
 
   // Form nhập / sửa khoản dùng chung: trong tấm trượt (điện thoại) hoặc khung bên phải (máy tính)
@@ -1201,88 +1201,112 @@ export default function TripPage() {
               )}
             </div>
 
+            {/* Mã QR nhận tiền: chỉ người được nhận lại tiền mới cần. Hành động nên nằm ở cột chính. */}
+            {(() => {
+              const receivers = orderedMembers.filter((m) => balances[m.id].net > 1);
+              if (receivers.length === 0) return null;
+              return (
+                <>
+                  <h2 style={sectionHead}>Mã QR nhận tiền</h2>
+                  <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 14, padding: "6px 16px 12px" }}>
+                    {receivers.map((m, idx) => {
+                      const from = transactions.filter((t) => t.toId === m.id).length;
+                      const label = m.id === meId ? "bạn" : m.name;
+                      return (
+                        <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 0", borderTop: idx === 0 ? "none" : "1px solid #E8F0F5" }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 14 }}>{m.name}{m.id === meId && <span style={{ fontWeight: 400, color: C.text2 }}> (bạn)</span>}</div>
+                            <div style={{ fontSize: 12.5, color: C.text2 }}>nhận {fmt(balances[m.id].net)}{from > 0 ? ` từ ${from} người` : ""}</div>
+                          </div>
+                          {m.qr_url ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                              <button type="button" onClick={() => setQrView(m.id)} aria-label={`Xem mã QR của ${label}`}
+                                style={{ border: "none", padding: 0, background: "none", cursor: "pointer", display: "flex" }}>
+                                <img src={m.qr_url} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", boxShadow: "0 1px 3px rgba(2,48,71,.15)" }} />
+                              </button>
+                              <label style={{ fontSize: 13, color: C.ink, fontWeight: 600, cursor: "pointer", padding: "8px 0", whiteSpace: "nowrap" }}>
+                                {qrBusyId === m.id ? "Đang tải ảnh..." : "Đổi ảnh"}
+                                <input type="file" accept="image/*" className="sr-only" onChange={(ev) => uploadQR(m, ev.target.files[0])} />
+                              </label>
+                            </div>
+                          ) : (
+                            <label style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, color: C.ink, fontWeight: 700, background: "#EDF5FA", borderRadius: 9, padding: "9px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                              <Plus size={14} weight="bold" aria-hidden="true" />{qrBusyId === m.id ? "Đang tải ảnh..." : `Thêm QR của ${label}`}
+                              <input type="file" accept="image/*" className="sr-only" onChange={(ev) => uploadQR(m, ev.target.files[0])} />
+                            </label>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div style={{ fontSize: 12, color: C.text2, paddingTop: 4 }}>Chỉ người được nhận lại tiền mới cần mã QR.</div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <div>
-            {/* Chi phí THẬT mỗi người phải chịu cho chuyến (shareExp) — ai trả hộ cũng không đổi, chuyển tiền không tính */}
-            <h2 style={wide ? { ...sectionHead, marginTop: 0 } : sectionHead}>Chi phí mỗi người</h2>
-            <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "14px 16px" }}>
-              {[...members].sort((a, b) => detail[b.id].shareExp - detail[a.id].shareExp).map((m) => {
-                const cost = detail[m.id].shareExp;
-                const maxCost = Math.max(...members.map((x) => detail[x.id].shareExp), 1);
+            {/* ---- Cột phụ: số liệu để hiểu vì sao ra các con số bên trái ---- */}
+            <h2 style={wide ? { ...sectionHead, marginTop: 0 } : sectionHead}>Tổng quan</h2>
+            {/* Điện thoại: "Tổng chi" chiếm cả hàng, hai ô còn lại chung một hàng, để số tiền không bị ngắt dòng */}
+            <div style={{ display: "grid", gridTemplateColumns: wide ? "repeat(3, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: 9 }}>
+              {[
+                ["Tổng chi", fmt(totalVND)],
+                ["Trung bình mỗi người", members.length > 0 ? fmt(totalVND / members.length) : "—"],
+                prepaidList.length > 0
+                  ? ["Chi trước chuyến đi", `${Math.round((prepaidTotal / Math.max(totalVND, 1)) * 100)}%`]
+                  : ["Số khoản chi", String(realExpenses.length)],
+              ].map(([k, v], idx) => (
+                <div key={k} style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "11px 12px", minWidth: 0, gridColumn: !wide && idx === 0 ? "1 / -1" : undefined }}>
+                  <div style={{ fontSize: 12, color: C.text2 }}>{k}</div>
+                  <div style={{ fontSize: wide ? 17 : 16, fontWeight: 800, marginTop: 2, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Gộp "chi phí mỗi người" và "số dư từng người" thành một bảng: mỗi người một dòng */}
+            <h2 style={sectionHead}>Chi tiết từng người</h2>
+            <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 14, padding: "14px 16px" }}>
+              {(() => {
+                // Điện thoại: rút gọn số (2.818k) để 4 cột vừa màn hình; máy tính: số đầy đủ
+                const num = (n) => (wide ? Math.round(n).toLocaleString("vi-VN") : fmtK(n));
+                const signed = (n) => (Math.abs(n) < 1 ? "0" : (n > 0 ? "+" : "−") + num(Math.abs(n)));
+                const th = { fontSize: 12, fontWeight: 600, color: C.text2, textAlign: "right", padding: "0 0 8px 8px", whiteSpace: "nowrap" };
+                const td = { textAlign: "right", padding: "9px 0 9px 8px", borderTop: "1px solid #E8F0F5", whiteSpace: "nowrap" };
                 return (
-                  <div key={m.id} style={{ marginBottom: 10 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, marginBottom: 4 }}>
-                      <span style={{ fontWeight: 600 }}>{m.name}{m.id === meId && <span style={{ fontWeight: 400, color: C.text2 }}> (bạn)</span>}</span>
-                      <span style={{ fontWeight: 700 }}>{fmt(cost)}</span>
-                    </div>
-                    <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${(cost / maxCost) * 100}%`, background: C.ink, borderRadius: 99 }} />
-                    </div>
-                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, fontVariantNumeric: "tabular-nums", tableLayout: "auto" }}>
+                    <thead>
+                      <tr>
+                        <th scope="col" style={{ ...th, textAlign: "left", paddingLeft: 0 }}>Người</th>
+                        <th scope="col" style={th}>Phần chi phí</th>
+                        <th scope="col" style={th}>Đã chi</th>
+                        <th scope="col" style={th}>Số dư</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderedMembers.map((m) => {
+                        const net = balances[m.id].net;
+                        const mine = m.id === meId;
+                        return (
+                          <tr key={m.id} style={{ fontWeight: mine ? 700 : 400 }}>
+                            <th scope="row" style={{ ...td, textAlign: "left", paddingLeft: 0, fontWeight: mine ? 700 : 600, whiteSpace: "normal" }}>
+                              {m.name}{mine && <span style={{ fontWeight: 400, color: C.text2 }}> (bạn)</span>}
+                            </th>
+                            <td style={td}>{num(detail[m.id].shareExp)}</td>
+                            <td style={td}>{num(detail[m.id].outlay)}</td>
+                            <td style={{ ...td, fontWeight: 800, color: Math.abs(net) < 1 ? C.text2 : net > 0 ? C.tealText : C.orangeText }}>{signed(net)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 );
-              })}
-              <div style={{ fontSize: 11.5, color: C.text2, marginTop: 4 }}>
-                Phần chi phí thật mỗi người phải chịu cho chuyến, ai trả hộ cũng không đổi.
+              })()}
+              <div style={{ fontSize: 12, color: C.text2, marginTop: 8, lineHeight: 1.5 }}>
+                Số dư = đã chi trừ phần chi phí. Dương là được nhận lại, âm là phải trả thêm.{wide ? " Đơn vị: đồng." : " Số làm tròn đến nghìn đồng."}
               </div>
             </div>
 
-            <h2 style={sectionHead}>Số dư từng người</h2>
-            {orderedMembers.map((m) => {
-              const b = balances[m.id];
-              const pos = b.net >= 0;
-              const settled = Math.abs(b.net) < 1;
-              return (
-                <div key={m.id} style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 14px", marginBottom: 9 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{m.name}{m.id === meId && <span style={{ fontWeight: 400, fontSize: 13, color: C.text2 }}> (bạn)</span>}</div>
-                    <div style={{ fontWeight: 800, color: settled ? C.text2 : pos ? C.tealText : C.orangeText, fontSize: 15, display: "inline-flex", alignItems: "center", gap: 4, fontVariantNumeric: "tabular-nums" }}>
-                      {settled ? <>đã cân bằng <Check size={14} weight="bold" aria-hidden="true" /></> : (pos ? "nhận lại " : "trả thêm ") + fmt(Math.abs(b.net))}
-                    </div>
-                  </div>
-                  {/* Tóm tắt 1 dòng: đã chi bao nhiêu trên phần chi phí của mình */}
-                  <div style={{ fontSize: 12.5, color: C.text2, marginTop: 3 }}>
-                    Đã chi {fmt(detail[m.id].outlay)} trên phần chi phí {fmt(detail[m.id].shareExp)}
-                  </div>
-                  <div style={{ height: 6, background: "#E3EEF5", borderRadius: 99, marginTop: 8, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, (Math.max(detail[m.id].outlay, 0) / Math.max(detail[m.id].shareExp, 1)) * 100)}%`, background: pos ? C.green : C.red, borderRadius: 99 }} />
-                  </div>
-                  {/* Mã QR nhận tiền của người này */}
-                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    {m.qr_url ? (
-                      <>
-                        <img src={m.qr_url} alt={`Mã QR của ${m.name}`} onClick={() => setQrView(m.id)}
-                          style={{ width: 44, height: 44, borderRadius: 6, boxShadow: "0 1px 3px rgba(2,48,71,.15)", cursor: "pointer", objectFit: "cover" }} />
-                        <span style={{ fontSize: 13, color: C.text2 }}>Mã QR nhận tiền. Bấm ảnh để phóng to.</span>
-                        <label style={{ fontSize: 13, color: C.ink, fontWeight: 600, cursor: "pointer", marginLeft: "auto", padding: "8px 0" }}>
-                          {qrBusyId === m.id ? "Đang tải ảnh..." : "Đổi ảnh"}
-                          <input type="file" accept="image/*" className="sr-only"
-                            onChange={(ev) => uploadQR(m, ev.target.files[0])} />
-                        </label>
-                      </>
-                    ) : (
-                      <label style={{ display: "inline-block", fontSize: 13.5, color: C.ink, fontWeight: 600, background: "#EDF5FA", borderRadius: 10, padding: "10px 14px", cursor: "pointer", whiteSpace: "nowrap" }}>
-                        {qrBusyId === m.id ? "Đang tải ảnh..." : m.id === meId ? "Thêm mã QR của bạn" : `Thêm mã QR của ${m.name}`}
-                        <input type="file" accept="image/*" className="sr-only"
-                          onChange={(ev) => uploadQR(m, ev.target.files[0])} />
-                      </label>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {prepaidList.length > 0 && (
-              <div style={{ background: C.sand, borderRadius: 12, padding: "12px 14px", marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink }}>Chi trước chuyến đi</div>
-                  <div style={{ fontSize: 12, color: C.ink }}>{prepaidList.length} khoản, chiếm {Math.round((prepaidTotal / Math.max(totalVND, 1)) * 100)}% tổng chi</div>
-                </div>
-                <div style={{ fontWeight: 800, fontSize: 16, color: C.ink }}>{fmt(prepaidTotal)}</div>
-              </div>
-            )}
-
             <h2 style={sectionHead}>Fact thú vị</h2>
-            {/* Luật phân cấp: số càng quan trọng nền càng đậm. 4 card = đủ 4 màu Riviera */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
               <div style={{ background: C.coral, color: C.ink, borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.75 }}>Đại gia của chuyến đi 👑</div>
@@ -1293,14 +1317,6 @@ export default function TripPage() {
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Khoản chi khủng nhất 💸</div>
                 <div style={{ fontWeight: 800, fontSize: 14.5, marginTop: 3, color: C.ink }}>{biggestExpense?.name || "—"}</div>
                 <div style={{ fontSize: 12 }}>{biggestExpense ? fmt(toVND(biggestExpense.amount, biggestExpense.currency, rates)) : ""}</div>
-              </div>
-              <div style={{ background: "#8ECAE6", color: "#023047", borderRadius: 12, padding: 14 }}>
-                <div style={{ fontSize: 11, opacity: 0.85 }}>Chi trung bình mỗi người</div>
-                <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3, color: C.ink }}>{members.length > 0 ? fmt(totalVND / members.length) : "—"}</div>
-              </div>
-              <div style={{ background: C.tealDark, color: "#fff", borderRadius: 12, padding: 14 }}>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Tổng "thiệt hại" cả chuyến</div>
-                <div style={{ fontWeight: 800, fontSize: 19, marginTop: 3 }}>{fmt(totalVND)}</div>
               </div>
             </div>
           </div>
@@ -1813,15 +1829,18 @@ export default function TripPage() {
       {qrView && memberOf(qrView)?.qr_url && (
         <div onClick={() => setQrView(null)}
           style={{ position: "fixed", inset: 0, background: "rgba(27,42,51,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, cursor: "pointer", padding: 20 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 20, textAlign: "center", maxWidth: 320, width: "100%", cursor: "default" }}>
-            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 12 }}>Chuyển tiền cho {nameOf(qrView)}</div>
-            <img src={memberOf(qrView).qr_url} alt={`QR của ${nameOf(qrView)}`} style={{ width: "100%", borderRadius: 10 }} />
+          <div role="dialog" aria-modal="true" aria-label={`Mã QR của ${nameOf(qrView)}`} onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, padding: 20, textAlign: "center", maxWidth: 360, width: "100%", maxHeight: "calc(100dvh - 40px)", display: "flex", flexDirection: "column", cursor: "default" }}>
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 12, flexShrink: 0 }}>Chuyển tiền cho {nameOf(qrView)}</div>
+            {/* Ảnh cao (vd QR in trên thiệp) được thu nhỏ cho vừa, để tiêu đề và nút Đóng luôn nằm trong màn hình */}
+            <img src={memberOf(qrView).qr_url} alt={`QR của ${nameOf(qrView)}`}
+              style={{ display: "block", maxWidth: "100%", width: "auto", height: "auto", maxHeight: "100%", minHeight: 0, flex: "0 1 auto", objectFit: "contain", alignSelf: "center", borderRadius: 10 }} />
             {/* Ai có link cũng đổi được ảnh QR, nên nhắc người chuyển tự kiểm tra tên chủ tài khoản */}
-            <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginTop: 12, lineHeight: 1.45, textAlign: "left" }}>
+            <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginTop: 12, lineHeight: 1.45, textAlign: "left", flexShrink: 0 }}>
               Trước khi chuyển, kiểm tra tên chủ tài khoản trong app ngân hàng đúng là {nameOf(qrView)}.
             </div>
             <button onClick={() => setQrView(null)}
-              style={{ marginTop: 14, width: "100%", padding: 10, background: "#023047", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+              style={{ marginTop: 14, width: "100%", padding: 10, background: "#023047", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>
               Đóng
             </button>
           </div>
