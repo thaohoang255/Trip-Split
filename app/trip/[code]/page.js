@@ -800,13 +800,16 @@ export default function TripPage() {
                   : <button type="button" onClick={() => setAskWho(true)} style={{ border: "none", background: "none", color: "#fff", font: "inherit", textDecoration: "underline", cursor: "pointer", padding: 0 }}>chọn bạn là ai</button>}
               </div>
             </div>
-            {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết */}
-            <div style={{ borderLeft: "1.5px dashed rgba(255,255,255,.4)", paddingLeft: 12, textAlign: "right", flexShrink: 0 }}>
+            {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết.
+                Chỉ trên điện thoại, nơi tên chuyến và tổng chi nằm sát nhau. Màn hình rộng đã có
+                khoảng trống ngăn cách nên bỏ vạch. */}
+            <div style={{ borderLeft: wide ? "none" : "1.5px dashed rgba(255,255,255,.4)", paddingLeft: wide ? 0 : 12, textAlign: "right", flexShrink: 0 }}>
               <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
               <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt(totalVND)}</div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+          {/* Màn hình rộng: hàng nút canh phải, nằm ngay dưới tổng chi */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12, justifyContent: wide ? "flex-end" : "flex-start" }}>
             <Tip tone="light" align="start" text="Copy link chuyến đi để gửi vào group chat. Ai có link đều xem và nhập khoản chi được, không cần tài khoản.">
               <button onClick={copyLink}
                 style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", color: copied ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
