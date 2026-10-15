@@ -1,6 +1,7 @@
 "use client";
 
 import { cloneElement, useEffect, useState, useCallback, useRef, useId } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowRight, CaretRight, Check, Plus, Scan, Trash, X } from "@phosphor-icons/react";
 import { supabase } from "../../../lib/supabase";
@@ -625,7 +626,7 @@ export default function TripPage() {
         <div style={{ textAlign: "center", maxWidth: 360 }}>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 10 }}>Không tìm thấy chuyến đi</div>
           <div style={{ fontSize: 13.5, color: C.text2, marginTop: 8, lineHeight: 1.6 }}>
-            Link có thể bị thiếu ký tự khi copy. Kiểm tra lại link trong group chat, hoặc về <a href="/" style={{ color: C.tealDark }}>trang chủ</a> tạo chuyến mới.
+            Link có thể bị thiếu ký tự khi copy. Kiểm tra lại link trong group chat, hoặc về <Link href="/" style={{ color: C.tealDark }}>trang chủ</Link> tạo chuyến mới.
           </div>
         </div>
       </div>
@@ -795,12 +796,12 @@ export default function TripPage() {
           {wide ? (
             <>
             <div style={wide ? { minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: HDR_LINE_GAP } : { minWidth: 0 }}>
-              <a href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: wide ? 0 : "4px 0" }}>
+              <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: wide ? 0 : "4px 0" }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
                   <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                 </svg>
                 <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: 1.2 }}>TripSplit</span>
-              </a>
+              </Link>
               <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2, marginTop: wide ? 0 : 4, overflowWrap: "anywhere" }}>{trip.name}</h1>
               <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: wide ? 0 : 3 }}>
                 {members.length} người · {me
@@ -852,12 +853,12 @@ export default function TripPage() {
             <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
             <div style={wide ? { minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: HDR_LINE_GAP } : { minWidth: 0 }}>
-              <a href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: wide ? 0 : "4px 0" }}>
+              <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: wide ? 0 : "4px 0" }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
                   <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                 </svg>
                 <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: 1.2 }}>TripSplit</span>
-              </a>
+              </Link>
               <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2, marginTop: wide ? 0 : 4, overflowWrap: "anywhere" }}>{trip.name}</h1>
               <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: wide ? 0 : 3 }}>
                 {members.length} người · {me
