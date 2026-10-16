@@ -649,9 +649,9 @@ export default function TripPage() {
   const settingsHead = { fontSize: 13.5, fontWeight: 700, color: C.ink, marginBottom: 8 };
 
   // 4 nút của chuyến: điện thoại nằm trong header nền xanh đậm (nút trong suốt), máy tính nằm cuối
-  // thanh tab nền sáng (nút trắng viền mảnh, trạng thái "đã" có dấu tích thay cho nền trắng đặc)
+  // thanh tab nền sáng (nút nền xanh nhạt như chip thành viên; trạng thái "đã" xanh đậm hơn kèm dấu tích)
   const pill = (on) => wide
-    ? { background: "#fff", color: C.ink, border: `1px solid ${on ? C.tealText : C.line}`, borderRadius: 999, padding: "6px 11px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }
+    ? { background: on ? "#DCEEF3" : "#EDF5FA", color: on ? C.tealText : C.ink, border: "none", borderRadius: 999, padding: "7px 12px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }
     : { background: on ? "#fff" : "rgba(255,255,255,.15)", color: on ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" };
   const doneMark = wide ? <Check size={13} weight="bold" color={C.tealText} aria-hidden="true" /> : null;
   const tipTone = wide ? undefined : "light";
@@ -834,7 +834,9 @@ export default function TripPage() {
           Máy tính: logo một hàng riêng ở giữa; dưới đó tên chuyến sát mép trái, tổng chi sát mép phải;
           4 nút chuyển xuống cuối thanh tab. */}
       <header style={{ background: C.tealDark, color: "#fff", padding: wide ? "18px 16px" : "12px 16px 14px" }}>
-        <div style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto" }}>
+        {/* Cùng bề rộng nội dung với thanh tab và danh sách bên dưới (1040/640 trừ lề 16px mỗi bên),
+            để tên chuyến, tổng chi, tab và nút thẳng mép với nhau */}
+        <div style={{ maxWidth: wide ? 1008 : 608, margin: "0 auto" }}>
           {wide ? (
             <div style={{ display: "grid", gap: 14 }}>
               <div style={{ textAlign: "center" }}>
@@ -892,7 +894,12 @@ export default function TripPage() {
       </header>
 
       {/* ===== TABS ===== */}
-      <div className={wide ? "tabs-wide" : undefined} style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto", padding: wide ? "0 16px" : 0, display: "flex", boxShadow: "0 1px 0 rgba(2,48,71,.08)", background: C.paper, position: "sticky", top: 0, zIndex: 5 }}>
+      {/* Máy tính: vạch kẻ dưới thanh tab chỉ dài bằng phần nội dung (không tính lề 16px), để header, tab,
+          vạch kẻ và danh sách cùng thẳng mép trái/phải. Điện thoại: thanh tab tràn hết bề ngang như cũ. */}
+      <div className={wide ? "tabs-wide" : undefined} style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto", padding: wide ? "0 16px" : 0, display: "flex", position: "sticky", top: 0, zIndex: 5,
+        ...(wide
+          ? { background: `linear-gradient(rgba(2,48,71,.08), rgba(2,48,71,.08)) bottom / 100% 1px no-repeat content-box, ${C.paper}` }
+          : { background: C.paper, boxShadow: "0 1px 0 rgba(2,48,71,.08)" }) }}>
         <Tip align="start" style={{ flex: wide ? "0 0 auto" : 1 }} text="Danh sách mọi khoản chi và trả nợ của chuyến. Bấm một khoản để sửa hoặc xóa.">
           <button className={`tabbtn ${tab === "expenses" ? "on" : ""}`} onClick={() => setTab("expenses")}>Sổ chi tiêu ({entries.length})</button>
         </Tip>
