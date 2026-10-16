@@ -161,7 +161,14 @@ export default function HomePage() {
     <div style={{ minHeight: "100vh", background: C.paper }}>
       {/* Hero */}
       <div style={{ background: C.tealDark, color: "#fff", padding: recent.length > 0 ? "28px 20px 24px" : "44px 20px 36px", textAlign: "center" }}>
-        <div style={{ fontSize: 12, letterSpacing: 3, opacity: 0.75, fontWeight: 600 }}>TRIPSPLIT</div>
+        {/* Logo: máy bay vàng + chữ TRIPSPLIT, cùng kiểu với header trang chuyến đi.
+            marginRight -3 bù khoảng giãn chữ thừa sau chữ cuối để cụm logo canh giữa đúng. */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 7 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
+            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+          </svg>
+          <span style={{ fontSize: 12, letterSpacing: 3, opacity: 0.75, fontWeight: 600, marginRight: -3 }}>TRIPSPLIT</span>
+        </div>
         <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: -0.5, marginTop: 6 }}>
           Đi chơi cứ vui,<br />tiền nong để app tính
         </div>

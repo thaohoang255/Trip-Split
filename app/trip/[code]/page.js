@@ -118,6 +118,10 @@ const C = {
 };
 
 
+// Chữ "TRIPSPLIT" trên header, cùng kiểu với trang chủ (chữ hoa giãn rộng, mờ nhẹ).
+// marginRight -3 bù khoảng giãn chữ thừa sau chữ cuối, để logo canh giữa đúng trên máy tính.
+const BRAND_TEXT = { fontSize: 12, letterSpacing: 3, fontWeight: 600, opacity: 0.75, textTransform: "uppercase", marginRight: -3 };
+
 // Vạch xé vé bên trái tổng chi (điện thoại). Vẽ bằng nền sọc thay cho border dashed: Safari trên iPhone
 // vẽ border dashed 1.5px màu mờ gần như mất hẳn (chỉ còn một chấm), còn nền sọc hiện giống nhau ở mọi trình duyệt.
 const TEAR_LINE = {
@@ -834,11 +838,11 @@ export default function TripPage() {
           {wide ? (
             <div style={{ display: "grid", gap: 14 }}>
               <div style={{ textAlign: "center" }}>
-                <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
+                <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none", color: "#fff" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
                     <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                   </svg>
-                  <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: 1.2 }}>TripSplit</span>
+                  <span style={BRAND_TEXT}>TripSplit</span>
                 </Link>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20 }}>
@@ -860,11 +864,11 @@ export default function TripPage() {
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
                 <div style={{ minWidth: 0 }}>
-                  <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: "4px 0" }}>
+                  <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none", color: "#fff", padding: "4px 0" }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
                       <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                     </svg>
-                    <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: 1.2 }}>TripSplit</span>
+                    <span style={BRAND_TEXT}>TripSplit</span>
                   </Link>
                   <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2, marginTop: 4, overflowWrap: "anywhere" }}>{trip.name}</h1>
                   <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 3 }}>
