@@ -117,10 +117,15 @@ const C = {
   orangeText: "#A84B00", // chữ "trả thêm"
 };
 
-// Nhịp header trên màn hình rộng: dòng bên trái cách nhau 13px. Khối bên phải tự kéo cao bằng
-// khối bên trái; HDR_RIGHT_GAP chỉ là khoảng tối thiểu giữa tổng chi và hàng nút.
-const HDR_LINE_GAP = 13;
-const HDR_RIGHT_GAP = 8;
+
+// Vạch xé vé bên trái tổng chi (điện thoại). Vẽ bằng nền sọc thay cho border dashed: Safari trên iPhone
+// vẽ border dashed 1.5px màu mờ gần như mất hẳn (chỉ còn một chấm), còn nền sọc hiện giống nhau ở mọi trình duyệt.
+const TEAR_LINE = {
+  backgroundImage: "repeating-linear-gradient(to bottom, rgba(255,255,255,.45) 0 4px, transparent 4px 8px)",
+  backgroundSize: "1.5px 100%",
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "left top",
+};
 
 // Lời giải thích nhỏ hiện khi rê chuột (máy tính) hoặc khi chọn nút bằng bàn phím.
 // align: "start" | "center" | "end" để bong bóng không tràn ra mép màn hình.
@@ -639,6 +644,37 @@ export default function TripPage() {
   const sectionHead = { fontSize: 16, fontWeight: 800, color: C.ink, marginTop: 26, marginBottom: 10 }; // tách riêng để ghi đè marginTop không lẫn với shorthand
   const settingsHead = { fontSize: 13.5, fontWeight: 700, color: C.ink, marginBottom: 8 };
 
+  // 4 nút của chuyến: điện thoại nằm trong header nền xanh đậm (nút trong suốt), máy tính nằm cuối
+  // thanh tab nền sáng (nút trắng viền mảnh, trạng thái "đã" có dấu tích thay cho nền trắng đặc)
+  const pill = (on) => wide
+    ? { background: "#fff", color: C.ink, border: `1px solid ${on ? C.tealText : C.line}`, borderRadius: 999, padding: "6px 11px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }
+    : { background: on ? "#fff" : "rgba(255,255,255,.15)", color: on ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" };
+  const doneMark = wide ? <Check size={13} weight="bold" color={C.tealText} aria-hidden="true" /> : null;
+  const tipTone = wide ? undefined : "light";
+  const headerButtons = (
+    <>
+      <Tip tone={tipTone} align={wide ? "center" : "start"} text="Copy link chuyến đi để gửi vào group chat. Ai có link đều xem và nhập khoản chi được, không cần tài khoản.">
+        <button onClick={copyLink} style={pill(copied)}>
+          {copied && doneMark}{copied ? "Đã copy" : "Mời bạn"}
+        </button>
+      </Tip>
+      <Tip tone={tipTone} text="Đổi tên chuyến, thêm hoặc sửa tên thành viên, chọn bạn là ai, và chỉnh tỉ giá ngoại tệ.">
+        <button onClick={openSettings} style={pill(false)}>Cài đặt</button>
+      </Tip>
+      {/* Lưu chuyến vào tài khoản Google, để mở lại từ trang chủ trên máy khác */}
+      <Tip tone={tipTone} align="end" text={saved
+        ? "Chuyến này đã nằm trong tài khoản Google của bạn, mở lại được từ trang chủ trên mọi máy. Bấm lần nữa để bỏ lưu."
+        : "Đăng nhập Google để lưu chuyến vào tài khoản, rồi mở lại từ trang chủ trên máy khác. Không bắt buộc."}>
+        <button onClick={toggleSave} style={pill(saved)}>
+          {saved && doneMark}{saved ? "Đã lưu" : "Lưu chuyến đi"}
+        </button>
+      </Tip>
+      <Tip tone={tipTone} align="end" text="Hướng dẫn dùng app: nhập khoản chi, trả nợ, xem ai chuyển cho ai và ý nghĩa từng nút.">
+        <button onClick={() => setHelpOpen(true)} style={pill(false)}>Trợ giúp</button>
+      </Tip>
+    </>
+  );
+
   // Form nhập / sửa khoản dùng chung: trong tấm trượt (điện thoại) hoặc khung bên phải (máy tính)
   const entryForm = (
             <div>
@@ -789,120 +825,63 @@ export default function TripPage() {
       {/* ===== HEADER =====
           Gọn lại để danh sách khoản chi hiện ngay màn hình đầu: tên chuyến bên trái,
           "cuống vé" tổng chi bên phải, hàng nút bên dưới. Danh sách thành viên đầy đủ nằm ở Cài đặt. */}
-      {/* Màn hình rộng: hai khối (tên chuyến | tổng chi + nút) cao bằng nhau và cùng nằm giữa header,
-          cách mép trên/dưới 18px, các dòng bên trái cách nhau 13px. Điện thoại giữ bố cục cũ. */}
+      {/* ===== HEADER =====
+          Điện thoại: tên chuyến bên trái, "cuống vé" tổng chi bên phải, hàng nút bên dưới.
+          Máy tính: logo một hàng riêng ở giữa; dưới đó tên chuyến sát mép trái, tổng chi sát mép phải;
+          4 nút chuyển xuống cuối thanh tab. */}
       <header style={{ background: C.tealDark, color: "#fff", padding: wide ? "18px 16px" : "12px 16px 14px" }}>
-        <div style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto", ...(wide ? { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20 } : {}) }}>
+        <div style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto" }}>
           {wide ? (
-            <>
-            <div style={wide ? { minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: HDR_LINE_GAP } : { minWidth: 0 }}>
-              <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: wide ? 0 : "4px 0" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
-                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                </svg>
-                <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: 1.2 }}>TripSplit</span>
-              </Link>
-              <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2, marginTop: wide ? 0 : 4, overflowWrap: "anywhere" }}>{trip.name}</h1>
-              <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: wide ? 0 : 3 }}>
-                {members.length} người · {me
-                  ? <>bạn là <b>{me.name}</b></>
-                  : <button type="button" onClick={() => setAskWho(true)} style={{ border: "none", background: "none", color: "#fff", font: "inherit", textDecoration: "underline", cursor: "pointer", padding: 0 }}>chọn bạn là ai</button>}
+            <div style={{ display: "grid", gap: 14 }}>
+              <div style={{ textAlign: "center" }}>
+                <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
+                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                  </svg>
+                  <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: 1.2 }}>TripSplit</span>
+                </Link>
               </div>
-            </div>
-              {/* Kéo cao bằng khối bên trái: tổng chi thẳng hàng dòng trên cùng, hàng nút thẳng hàng dòng dưới cùng */}
-              <div style={{ alignSelf: "stretch", display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "space-between", gap: HDR_RIGHT_GAP }}>
-            {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết.
-                Chỉ trên điện thoại, nơi tên chuyến và tổng chi nằm sát nhau. Màn hình rộng đã có
-                khoảng trống ngăn cách nên bỏ vạch. */}
-            <div style={{ borderLeft: wide ? "none" : "1.5px dashed rgba(255,255,255,.4)", paddingLeft: wide ? 0 : 12, textAlign: "right", flexShrink: 0 }}>
-              <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
-              <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt(totalVND)}</div>
-            </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <Tip tone="light" align="start" text="Copy link chuyến đi để gửi vào group chat. Ai có link đều xem và nhập khoản chi được, không cần tài khoản.">
-              <button onClick={copyLink}
-                style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", color: copied ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                {copied ? "Đã copy" : "Mời bạn"}
-              </button>
-            </Tip>
-            <Tip tone="light" text="Đổi tên chuyến, thêm hoặc sửa tên thành viên, chọn bạn là ai, và chỉnh tỉ giá ngoại tệ.">
-              <button onClick={openSettings}
-                style={{ background: "rgba(255,255,255,.15)", color: "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Cài đặt
-              </button>
-            </Tip>
-            {/* Lưu chuyến vào tài khoản Google, để mở lại từ trang chủ trên máy khác */}
-            <Tip tone="light" align="end" text={saved
-              ? "Chuyến này đã nằm trong tài khoản Google của bạn, mở lại được từ trang chủ trên mọi máy. Bấm lần nữa để bỏ lưu."
-              : "Đăng nhập Google để lưu chuyến vào tài khoản, rồi mở lại từ trang chủ trên máy khác. Không bắt buộc."}>
-              <button onClick={toggleSave}
-                style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", color: saved ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                {saved ? "Đã lưu" : "Lưu chuyến đi"}
-              </button>
-            </Tip>
-            <Tip tone="light" align="end" text="Hướng dẫn dùng app: nhập khoản chi, trả nợ, xem ai chuyển cho ai và ý nghĩa từng nút.">
-              <button onClick={() => setHelpOpen(true)}
-                style={{ background: "rgba(255,255,255,.15)", color: "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Trợ giúp
-              </button>
-            </Tip>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20 }}>
+                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+                  <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2, overflowWrap: "anywhere" }}>{trip.name}</h1>
+                  <div style={{ fontSize: 12.5, opacity: 0.85 }}>
+                    {members.length} người · {me
+                      ? <>bạn là <b>{me.name}</b></>
+                      : <button type="button" onClick={() => setAskWho(true)} style={{ border: "none", background: "none", color: "#fff", font: "inherit", textDecoration: "underline", cursor: "pointer", padding: 0 }}>chọn bạn là ai</button>}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
+                  <div style={{ fontSize: 21, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", lineHeight: 1.2 }}>{fmt(totalVND)}</div>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
-            <div style={wide ? { minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: HDR_LINE_GAP } : { minWidth: 0 }}>
-              <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: wide ? 0 : "4px 0" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
-                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                </svg>
-                <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: 1.2 }}>TripSplit</span>
-              </Link>
-              <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2, marginTop: wide ? 0 : 4, overflowWrap: "anywhere" }}>{trip.name}</h1>
-              <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: wide ? 0 : 3 }}>
-                {members.length} người · {me
-                  ? <>bạn là <b>{me.name}</b></>
-                  : <button type="button" onClick={() => setAskWho(true)} style={{ border: "none", background: "none", color: "#fff", font: "inherit", textDecoration: "underline", cursor: "pointer", padding: 0 }}>chọn bạn là ai</button>}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
+                <div style={{ minWidth: 0 }}>
+                  <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", color: "#fff", opacity: 0.9, padding: "4px 0" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
+                      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                    </svg>
+                    <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: 1.2 }}>TripSplit</span>
+                  </Link>
+                  <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2, marginTop: 4, overflowWrap: "anywhere" }}>{trip.name}</h1>
+                  <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 3 }}>
+                    {members.length} người · {me
+                      ? <>bạn là <b>{me.name}</b></>
+                      : <button type="button" onClick={() => setAskWho(true)} style={{ border: "none", background: "none", color: "#fff", font: "inherit", textDecoration: "underline", cursor: "pointer", padding: 0 }}>chọn bạn là ai</button>}
+                  </div>
+                </div>
+                {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết */}
+                <div style={{ ...TEAR_LINE, paddingLeft: 12, textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
+                  <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt(totalVND)}</div>
+                </div>
               </div>
-            </div>
-            {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết.
-                Chỉ trên điện thoại, nơi tên chuyến và tổng chi nằm sát nhau. Màn hình rộng đã có
-                khoảng trống ngăn cách nên bỏ vạch. */}
-            <div style={{ borderLeft: wide ? "none" : "1.5px dashed rgba(255,255,255,.4)", paddingLeft: wide ? 0 : 12, textAlign: "right", flexShrink: 0 }}>
-              <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
-              <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt(totalVND)}</div>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
-            <Tip tone="light" align="start" text="Copy link chuyến đi để gửi vào group chat. Ai có link đều xem và nhập khoản chi được, không cần tài khoản.">
-              <button onClick={copyLink}
-                style={{ background: copied ? "#fff" : "rgba(255,255,255,.15)", color: copied ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                {copied ? "Đã copy" : "Mời bạn"}
-              </button>
-            </Tip>
-            <Tip tone="light" text="Đổi tên chuyến, thêm hoặc sửa tên thành viên, chọn bạn là ai, và chỉnh tỉ giá ngoại tệ.">
-              <button onClick={openSettings}
-                style={{ background: "rgba(255,255,255,.15)", color: "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Cài đặt
-              </button>
-            </Tip>
-            {/* Lưu chuyến vào tài khoản Google, để mở lại từ trang chủ trên máy khác */}
-            <Tip tone="light" align="end" text={saved
-              ? "Chuyến này đã nằm trong tài khoản Google của bạn, mở lại được từ trang chủ trên mọi máy. Bấm lần nữa để bỏ lưu."
-              : "Đăng nhập Google để lưu chuyến vào tài khoản, rồi mở lại từ trang chủ trên máy khác. Không bắt buộc."}>
-              <button onClick={toggleSave}
-                style={{ background: saved ? "#fff" : "rgba(255,255,255,.15)", color: saved ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                {saved ? "Đã lưu" : "Lưu chuyến đi"}
-              </button>
-            </Tip>
-            <Tip tone="light" align="end" text="Hướng dẫn dùng app: nhập khoản chi, trả nợ, xem ai chuyển cho ai và ý nghĩa từng nút.">
-              <button onClick={() => setHelpOpen(true)}
-                style={{ background: "rgba(255,255,255,.15)", color: "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Trợ giúp
-              </button>
-            </Tip>
-          </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+                {headerButtons}
+              </div>
             </>
           )}
         </div>
@@ -919,6 +898,11 @@ export default function TripPage() {
         <Tip align={wide ? "center" : "end"} style={{ flex: wide ? "0 0 auto" : 1 }} text="Bảng chi tiết mỗi khoản chia cho từng người, để cả nhóm kiểm tra lại trước khi chuyển tiền.">
           <button className={`tabbtn ${tab === "matrix" ? "on" : ""}`} onClick={() => { setTab("matrix"); load(); }}>Bảng chia</button>
         </Tip>
+        {wide && (
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, paddingLeft: 16 }}>
+            {headerButtons}
+          </div>
+        )}
       </div>
 
       <div style={{ maxWidth: wide ? 1040 : 640, margin: "0 auto", padding: wide ? "20px 16px 60px" : "18px 16px 110px" }}>
