@@ -130,3 +130,22 @@ label:has(> .sr-only:focus-visible) {
     transition: none;
   }
 }
+
+/* Vùng bấm tối thiểu 44×44px (khuyến nghị cho màn hình cảm ứng) mà không đổi kích thước nhìn thấy:
+   một lớp vô hình canh giữa nút, lớn ít nhất 44px mỗi chiều. Nút lớn hơn 44px giữ nguyên. */
+button,
+a[href],
+label:has(> input[type="file"]) {
+  position: relative;
+}
+button::after,
+a[href]::after,
+label:has(> input[type="file"])::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}

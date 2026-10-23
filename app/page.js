@@ -6,7 +6,7 @@ import { CaretRight, X } from "@phosphor-icons/react";
 import { supabase } from "../lib/supabase";
 import { computeBalances, fmt } from "../lib/money";
 import { useWide } from "../lib/useWide";
-import { COLORS } from "../lib/colors";
+import { COLORS, SHADOW } from "../lib/colors";
 
 // ============================================================
 // TRANG CHỦ
@@ -130,21 +130,21 @@ export default function HomePage() {
   function renderTripCard(t) {
     return (
       <a key={t.id} href={`/trip/${t.code}`} style={{ textDecoration: "none", color: "inherit" }}>
-        <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div style={{ background: "#fff", boxShadow: SHADOW.card, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 14.5, display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ fontWeight: 600, fontSize: "0.90625rem", display: "flex", alignItems: "center", gap: 8 }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill={C.teal} style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
                 <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
               </svg>
               {t.name}
             </div>
             {t.members?.length > 0 && (
-              <div style={{ fontSize: 12, color: C.text2, marginTop: 3, paddingLeft: 23 }}>
+              <div style={{ fontSize: "0.75rem", color: C.text2, marginTop: 3, paddingLeft: 23 }}>
                 {t.members.map((m) => m.name).join(" · ")}
               </div>
             )}
           </div>
-          <div style={{ fontSize: 12, color: C.text2, flexShrink: 0 }}>
+          <div style={{ fontSize: "0.75rem", color: C.text2, flexShrink: 0 }}>
             {new Date(t.created_at).toLocaleDateString("vi-VN")}
           </div>
         </div>
@@ -170,38 +170,38 @@ export default function HomePage() {
           <svg width="12" height="12" viewBox="0 0 24 24" fill={C.sun} style={{ transform: "rotate(45deg)" }} aria-hidden="true">
             <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
           </svg>
-          <span style={{ fontSize: 12, letterSpacing: 3, opacity: 0.75, fontWeight: 600, marginRight: -3 }}>TRIPSPLIT</span>
+          <span style={{ fontSize: "0.75rem", letterSpacing: 3, opacity: 0.75, fontWeight: 600, marginRight: -3 }}>TRIPSPLIT</span>
         </div>
-        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: -0.5, marginTop: 6 }}>
+        <h1 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: -0.5, marginTop: 6 }}>
           Đi chơi cứ vui,<br />tiền nong để app tính
-        </div>
+        </h1>
         {recent.length === 0 && (
-          <div style={{ fontSize: 14, opacity: 0.85, marginTop: 10, maxWidth: 420, margin: "10px auto 0" }}>
+          <div style={{ fontSize: "0.875rem", opacity: 0.85, marginTop: 10, maxWidth: 420, margin: "10px auto 0" }}>
             Cả nhóm cùng nhập khoản chi qua một link chung. Cuối chuyến, app tính ai chuyển cho ai bao nhiêu.
           </div>
         )}
       </div>
 
       {/* Máy tính + có chuyến gần đây: chuyến gần đây (và danh sách admin) bên trái, form tạo chuyến bên phải */}
-      <div style={wide && recent.length > 0
+      <main style={wide && recent.length > 0
         ? { maxWidth: 1040, margin: "0 auto", padding: "28px 16px 60px", display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gridTemplateAreas: '"recent form" "admin form"', columnGap: 28, alignItems: "start" }
         : { maxWidth: 520, margin: "0 auto", padding: "26px 16px 60px" }}>
 
         {/* ===== Chuyến gần đây: quay lại chuyến cũ không cần tìm link trong group chat ===== */}
         {recent.length > 0 && (
           <section style={{ marginBottom: 22, gridArea: "recent" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 10 }}>Chuyến gần đây trên máy này</h2>
+            <h2 style={{ fontSize: "1rem", fontWeight: 800, marginBottom: 10 }}>Chuyến gần đây trên máy này</h2>
             {recent.map((t) => {
               const owes = t.myNet !== null && t.myNet < -1;
               const gets = t.myNet !== null && t.myNet > 1;
               return (
                 <a key={t.code} href={`/trip/${t.code}`} style={{ textDecoration: "none", color: "inherit" }}>
-                  <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 12px 12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  <div style={{ background: "#fff", boxShadow: SHADOW.card, borderRadius: 12, padding: "12px 12px 12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14.5 }}>{t.name}</div>
-                      <div style={{ fontSize: 12, color: C.text2, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.members.join(" · ")}</div>
+                      <div style={{ fontWeight: 700, fontSize: "0.90625rem" }}>{t.name}</div>
+                      <div style={{ fontSize: "0.75rem", color: C.text2, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.members.join(" · ")}</div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, fontSize: 12.5, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, fontSize: "0.78125rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
                       color: owes ? C.orangeText : gets ? C.tealText : C.text2 }}>
                       {owes ? `trả ${fmt(-t.myNet)}` : gets ? `nhận ${fmt(t.myNet)}` : t.myNet !== null ? "đã cân bằng" : ""}
                       <CaretRight size={15} color={C.text2} aria-hidden="true" />
@@ -214,19 +214,19 @@ export default function HomePage() {
         )}
 
         {/* ===== Form tạo chuyến đi ===== */}
-        <form onSubmit={(e) => { e.preventDefault(); createTrip(); }} style={{ gridArea: "form", background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 16, padding: 20 }}>
-          <h2 style={{ fontWeight: 800, fontSize: 17, marginBottom: 14 }}>Tạo chuyến đi mới</h2>
+        <form onSubmit={(e) => { e.preventDefault(); createTrip(); }} style={{ gridArea: "form", background: "#fff", boxShadow: SHADOW.card, borderRadius: 16, padding: 20 }}>
+          <h2 style={{ fontWeight: 800, fontSize: "1.0625rem", marginBottom: 14 }}>Tạo chuyến đi mới</h2>
 
-          <label htmlFor="trip-name" style={{ display: "block", fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Tên chuyến đi</label>
+          <label htmlFor="trip-name" style={{ display: "block", fontSize: "0.78125rem", fontWeight: 600, marginBottom: 6 }}>Tên chuyến đi</label>
           <input
             id="trip-name"
             placeholder="vd: Đà Lạt tháng 7"
             value={tripName}
             onChange={(e) => setTripName(e.target.value)}
-            style={{ width: "100%", padding: "11px 13px", border: "none", background: C.fill, borderRadius: 10, fontSize: 14, marginBottom: 14 }}
+            style={{ width: "100%", padding: "12px 13px", border: "none", background: C.fill, borderRadius: 10, fontSize: "1rem", marginBottom: 14 }}
           />
 
-          <div id="members-label" style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Thành viên <span style={{ fontWeight: 400, color: C.text2 }}>(nhập tên, không cần tài khoản)</span></div>
+          <div id="members-label" style={{ fontSize: "0.78125rem", fontWeight: 600, marginBottom: 6 }}>Thành viên <span style={{ fontWeight: 400, color: C.text2 }}>(nhập tên, không cần tài khoản)</span></div>
           {memberNames.map((name, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <input
@@ -234,7 +234,7 @@ export default function HomePage() {
                 aria-labelledby="members-label"
                 value={name}
                 onChange={(e) => setMemberName(i, e.target.value)}
-                style={{ flex: 1, padding: "10px 13px", border: "none", background: C.fill, borderRadius: 10, fontSize: 14 }}
+                style={{ flex: 1, padding: "12px 13px", border: "none", background: C.fill, borderRadius: 10, fontSize: "1rem" }}
               />
               {memberNames.length > 2 && (
                 <button
@@ -250,25 +250,25 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => setMemberNames((prev) => [...prev, ""])}
-            style={{ background: C.fill, border: "none", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: 13.5, color: C.tealDark, fontWeight: 600, marginBottom: 16, width: "100%" }}
+            style={{ background: C.fill, border: "none", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: "0.84375rem", color: C.tealDark, fontWeight: 600, marginBottom: 16, width: "100%" }}
           >Thêm thành viên</button>
 
           {err && (
-            <div style={{ fontSize: 13, color: C.ink, background: C.attention, borderRadius: 10, padding: "9px 12px", marginBottom: 12 }}>
+            <div style={{ fontSize: "0.8125rem", color: C.ink, background: C.attention, borderRadius: 10, padding: "9px 12px", marginBottom: 12 }}>
               {err}
-              {errDetail && <div style={{ fontSize: 11.5, marginTop: 3, wordBreak: "break-word" }}>{errDetail}</div>}
+              {errDetail && <div style={{ fontSize: "0.71875rem", marginTop: 3, wordBreak: "break-word" }}>{errDetail}</div>}
             </div>
           )}
 
           <button
             type="submit"
             disabled={creating}
-            style={{ width: "100%", padding: 13, background: C.coral, color: C.ink, opacity: creating ? 0.7 : 1, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: creating ? "wait" : "pointer" }}
+            style={{ width: "100%", padding: 13, background: C.coral, color: C.ink, opacity: creating ? 0.7 : 1, border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.9375rem", cursor: creating ? "wait" : "pointer" }}
           >
             {creating ? "Đang tạo chuyến..." : "Tạo chuyến"}
           </button>
 
-          <div style={{ fontSize: 12, color: C.text2, marginTop: 12, lineHeight: 1.5 }}>
+          <div style={{ fontSize: "0.75rem", color: C.text2, marginTop: 12, lineHeight: 1.5 }}>
             Tạo xong, chuyến có một link riêng. Gửi link vào group chat là cả nhóm vào nhập được.
             Chỉ người có link mới xem được chuyến.
           </div>
@@ -280,48 +280,48 @@ export default function HomePage() {
             <div style={{ textAlign: "center" }}>
               <button
                 onClick={loginGoogle}
-                style={{ background: C.fill, border: "none", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 999, padding: "12px 22px", cursor: "pointer", fontSize: 14, color: C.tealDark, fontWeight: 600, whiteSpace: "nowrap" }}
+                style={{ background: C.fill, border: "none", boxShadow: SHADOW.card, borderRadius: 999, padding: "12px 22px", cursor: "pointer", fontSize: "0.875rem", color: C.tealDark, fontWeight: 600, whiteSpace: "nowrap" }}
               >
                 Đăng nhập với Google
               </button>
-              <div style={{ fontSize: 12, color: C.text2, marginTop: 8 }}>
+              <div style={{ fontSize: "0.75rem", color: C.text2, marginTop: 8 }}>
                 Đăng nhập để lưu và xem lại các chuyến của bạn. Không bắt buộc, vào bằng link vẫn dùng được.
               </div>
             </div>
           ) : (
-            <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 16, padding: 20 }}>
+            <div style={{ background: "#fff", boxShadow: SHADOW.card, borderRadius: 16, padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div style={{ fontWeight: 800, fontSize: 16 }}>Chuyến đi của tôi</div>
+                <div style={{ fontWeight: 800, fontSize: "1rem" }}>Chuyến đi của tôi</div>
                 <button
                   onClick={() => supabase.auth.signOut()}
-                  style={{ border: "none", background: "none", color: C.text2, fontSize: 13.5, padding: "8px 0", cursor: "pointer" }}
+                  style={{ border: "none", background: "none", color: C.text2, fontSize: "0.84375rem", padding: "8px 0", cursor: "pointer" }}
                 >Đăng xuất</button>
               </div>
 
-              {myTrips === null && <div style={{ fontSize: 13.5, color: C.text2 }}>Đang tải...</div>}
+              {myTrips === null && <div style={{ fontSize: "0.84375rem", color: C.text2 }}>Đang tải...</div>}
 
               {myTrips !== null && myTrips.length === 0 && (
-                <div style={{ fontSize: 13.5, color: C.text2, lineHeight: 1.6 }}>
+                <div style={{ fontSize: "0.84375rem", color: C.text2, lineHeight: 1.6 }}>
                   Chưa có chuyến nào. Tạo chuyến mới, hoặc mở link bạn bè gửi rồi bấm Lưu chuyến, chuyến đó sẽ hiện ở đây.
                 </div>
               )}
 
               {myTrips !== null && mineTrips.length > 0 && (
                 <>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, margin: "4px 0 8px" }}>Chuyến của tôi</h3>
+                  <h3 style={{ fontSize: "0.875rem", fontWeight: 700, margin: "4px 0 8px" }}>Chuyến của tôi</h3>
                   {mineTrips.map(renderTripCard)}
                 </>
               )}
               {myTrips !== null && otherTrips.length > 0 && (
                 <>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, margin: "14px 0 8px" }}>Chuyến khác trong hệ thống</h3>
+                  <h3 style={{ fontSize: "0.875rem", fontWeight: 700, margin: "14px 0 8px" }}>Chuyến khác trong hệ thống</h3>
                   {otherTrips.map(renderTripCard)}
                 </>
               )}
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
