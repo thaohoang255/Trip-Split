@@ -6,6 +6,7 @@ import { CaretRight, X } from "@phosphor-icons/react";
 import { supabase } from "../lib/supabase";
 import { computeBalances, fmt } from "../lib/money";
 import { useWide } from "../lib/useWide";
+import { COLORS } from "../lib/colors";
 
 // ============================================================
 // TRANG CHỦ
@@ -14,11 +15,13 @@ import { useWide } from "../lib/useWide";
 // ============================================================
 
 // Bảng màu "Biển": Sky Blue - Blue Green - Prussian Blue - Selective Yellow - UT Orange
+// Bí danh cho bảng màu dùng chung (lib/colors.js). Không thêm mã màu mới ở đây.
 const C = {
-  ink: "#023047", teal: "#219EBC", tealDark: "#023047", coral: "#FB8500",
-  sand: "#FFEDC2", paper: "#F6FBFE", line: "#D9E8F1",
-  text2: "#56656E", // chữ phụ: đạt tương phản 4.5:1 trên nền trắng và nền ô nhập
-  tealText: "#0B6F88", orangeText: "#A84B00", // chữ "nhận lại" / "trả thêm"
+  ink: COLORS.ink, teal: COLORS.teal, tealDark: COLORS.ink, coral: COLORS.action,
+  sand: COLORS.tag, paper: COLORS.paper, line: COLORS.line, fill: COLORS.fill,
+  attention: COLORS.attention, sun: COLORS.sun,
+  text2: COLORS.text2,
+  tealText: COLORS.getText, orangeText: COLORS.oweText, // chữ "nhận lại" / "trả thêm"
 };
 
 export default function HomePage() {
@@ -130,7 +133,7 @@ export default function HomePage() {
         <div style={{ background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 14.5, display: "flex", alignItems: "center", gap: 8 }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="#219EBC" style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill={C.teal} style={{ flexShrink: 0, transform: "rotate(45deg)" }}>
                 <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
               </svg>
               {t.name}
@@ -164,7 +167,7 @@ export default function HomePage() {
         {/* Logo: máy bay vàng + chữ TRIPSPLIT, cùng kiểu với header trang chuyến đi.
             marginRight -3 bù khoảng giãn chữ thừa sau chữ cuối để cụm logo canh giữa đúng. */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 7 }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill={C.sun} style={{ transform: "rotate(45deg)" }} aria-hidden="true">
             <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
           </svg>
           <span style={{ fontSize: 12, letterSpacing: 3, opacity: 0.75, fontWeight: 600, marginRight: -3 }}>TRIPSPLIT</span>
@@ -220,7 +223,7 @@ export default function HomePage() {
             placeholder="vd: Đà Lạt tháng 7"
             value={tripName}
             onChange={(e) => setTripName(e.target.value)}
-            style={{ width: "100%", padding: "11px 13px", border: "none", background: "#EDF5FA", borderRadius: 10, fontSize: 14, marginBottom: 14 }}
+            style={{ width: "100%", padding: "11px 13px", border: "none", background: C.fill, borderRadius: 10, fontSize: 14, marginBottom: 14 }}
           />
 
           <div id="members-label" style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Thành viên <span style={{ fontWeight: 400, color: C.text2 }}>(nhập tên, không cần tài khoản)</span></div>
@@ -231,13 +234,13 @@ export default function HomePage() {
                 aria-labelledby="members-label"
                 value={name}
                 onChange={(e) => setMemberName(i, e.target.value)}
-                style={{ flex: 1, padding: "10px 13px", border: "none", background: "#EDF5FA", borderRadius: 10, fontSize: 14 }}
+                style={{ flex: 1, padding: "10px 13px", border: "none", background: C.fill, borderRadius: 10, fontSize: 14 }}
               />
               {memberNames.length > 2 && (
                 <button
                   type="button"
                   onClick={() => setMemberNames((prev) => prev.filter((_, idx) => idx !== i))}
-                  style={{ background: "#EDF5FA", border: "none", borderRadius: 10, padding: "0 14px", cursor: "pointer", color: C.text2, display: "flex", alignItems: "center" }}
+                  style={{ background: C.fill, border: "none", borderRadius: 10, padding: "0 14px", cursor: "pointer", color: C.text2, display: "flex", alignItems: "center" }}
                   aria-label={`Xóa ${name || `người ${i + 1}`}`}
                 ><X size={16} weight="bold" /></button>
               )}
@@ -247,11 +250,11 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => setMemberNames((prev) => [...prev, ""])}
-            style={{ background: "#EDF5FA", border: "none", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: 13.5, color: C.tealDark, fontWeight: 600, marginBottom: 16, width: "100%" }}
+            style={{ background: C.fill, border: "none", borderRadius: 10, padding: "9px 16px", cursor: "pointer", fontSize: 13.5, color: C.tealDark, fontWeight: 600, marginBottom: 16, width: "100%" }}
           >Thêm thành viên</button>
 
           {err && (
-            <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginBottom: 12 }}>
+            <div style={{ fontSize: 13, color: C.ink, background: C.attention, borderRadius: 10, padding: "9px 12px", marginBottom: 12 }}>
               {err}
               {errDetail && <div style={{ fontSize: 11.5, marginTop: 3, wordBreak: "break-word" }}>{errDetail}</div>}
             </div>
@@ -277,7 +280,7 @@ export default function HomePage() {
             <div style={{ textAlign: "center" }}>
               <button
                 onClick={loginGoogle}
-                style={{ background: "#EDF5FA", border: "none", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 999, padding: "12px 22px", cursor: "pointer", fontSize: 14, color: C.tealDark, fontWeight: 600, whiteSpace: "nowrap" }}
+                style={{ background: C.fill, border: "none", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 999, padding: "12px 22px", cursor: "pointer", fontSize: 14, color: C.tealDark, fontWeight: 600, whiteSpace: "nowrap" }}
               >
                 Đăng nhập với Google
               </button>

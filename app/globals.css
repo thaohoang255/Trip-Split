@@ -41,7 +41,7 @@ label:has(> .sr-only:focus-visible) {
 }
 
 ::selection {
-  background: #8ecae6;
+  background: #dceef3; /* COLORS.selected */
   color: #023047;
 }
 

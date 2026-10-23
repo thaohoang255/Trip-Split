@@ -3,10 +3,11 @@
 import { cloneElement, useEffect, useState, useCallback, useRef, useId } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowRight, CaretRight, Check, Plus, Scan, Trash, X } from "@phosphor-icons/react";
+import { ArrowRight, CaretRight, Check, Plus, Scan, Trash, WarningCircle, X } from "@phosphor-icons/react";
 import { supabase } from "../../../lib/supabase";
 import { toVND, computeBalances, fmt } from "../../../lib/money";
 import { useWide } from "../../../lib/useWide";
+import { COLORS } from "../../../lib/colors";
 
 // ============================================================
 // TRANG CHUYẾN ĐI — /trip/[code]
@@ -99,22 +100,25 @@ function parseAmount(s) {
 }
 
 // Bảng màu "Biển": Sky Blue - Blue Green - Prussian Blue - Selective Yellow - UT Orange
+// Bí danh cho bảng màu dùng chung (lib/colors.js). Không thêm mã màu mới ở đây.
 const C = {
-  ink: "#023047",      // Prussian Blue - chữ chính
-  teal: "#219EBC",     // Blue Green - màu chủ đạo (chip, viền focus)
-  tealDark: "#023047", // Prussian Blue - header, card fact đậm
-  coral: "#FB8500",    // UT Orange - nút hành động chính
-  sand: "#FFEDC2",     // Selective Yellow nhạt - tag, dải trả trước
-  paper: "#F6FBFE",    // nền giấy ngả trời
-  line: "#D9E8F1",     // đường viền xanh nhạt
-  green: "#219EBC",    // Blue Green - tiền NHẬN LẠI
-  red: "#FB8500",      // UT Orange - tiền PHẢI TRẢ
-  purple: "#023047",   // Prussian - màu của chuyển tiền (tách khỏi xanh nhận lại)
-  // Bản đậm của màu tiền để dùng cho CHỮ (thanh và nền vẫn dùng màu tươi ở trên).
-  // Màu tươi chỉ đạt 2.5–3.1:1 trên nền trắng; các màu này đạt trên 4.5:1.
-  text2: "#56656E",      // chữ phụ, ghi chú
-  tealText: "#0B6F88",   // chữ "nhận lại"
-  orangeText: "#A84B00", // chữ "trả thêm"
+  ink: COLORS.ink,
+  teal: COLORS.teal,
+  tealDark: COLORS.ink,
+  coral: COLORS.action,      // chỉ nút hành động chính, tab đang chọn, khoản đang sửa
+  sand: COLORS.tag,
+  paper: COLORS.paper,
+  line: COLORS.line,
+  fill: COLORS.fill,
+  selected: COLORS.selected,
+  attention: COLORS.attention,
+  sun: COLORS.sun,
+  green: COLORS.teal,        // thanh "nhận lại"
+  red: COLORS.action,        // thanh "trả thêm" (chỉ dùng trong biểu đồ)
+  purple: COLORS.ink,        // màu của chuyển tiền
+  text2: COLORS.text2,
+  tealText: COLORS.getText,  // chữ "nhận lại"
+  orangeText: COLORS.oweText,// chữ "trả thêm"
 };
 
 
@@ -651,7 +655,7 @@ export default function TripPage() {
   // 4 nút của chuyến: điện thoại nằm trong header nền xanh đậm (nút trong suốt), máy tính nằm cuối
   // thanh tab nền sáng (nút nền xanh nhạt như chip thành viên; trạng thái "đã" xanh đậm hơn kèm dấu tích)
   const pill = (on) => wide
-    ? { background: on ? "#DCEEF3" : "#EDF5FA", color: on ? C.tealText : C.ink, border: "none", borderRadius: 999, padding: "7px 12px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }
+    ? { background: on ? C.selected : C.fill, color: on ? C.tealText : C.ink, border: "none", borderRadius: 999, padding: "7px 12px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 5 }
     : { background: on ? "#fff" : "rgba(255,255,255,.15)", color: on ? C.tealDark : "#fff", border: "none", borderRadius: 999, padding: "8px 9px", fontSize: 12.5, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" };
   const doneMark = wide ? <Check size={13} weight="bold" color={C.tealText} aria-hidden="true" /> : null;
   const tipTone = wide ? undefined : "light";
@@ -783,7 +787,7 @@ export default function TripPage() {
                   <label htmlFor="t-note" style={fieldLabel}>Ghi chú <span style={{ fontWeight: 400, color: C.text2 }}>(không bắt buộc)</span></label>
                   <input id="t-note" className="inp" placeholder="vd: Duyên trả lại tiền ăn tối" value={fName}
                     onChange={(e) => setFName(e.target.value)} style={{ marginBottom: 14 }} />
-                  <div style={{ fontSize: 12, color: C.text2, background: "#F3F8FB", borderRadius: 10, padding: "8px 12px", marginBottom: 14, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 12, color: C.text2, background: C.fill, borderRadius: 10, padding: "8px 12px", marginBottom: 14, lineHeight: 1.5 }}>
                     Dùng khi A đưa tiền lại cho B để trả nợ. Khoản này không tính vào chi phí.
                     Nếu A trả hộ một khoản chi cho B (vd tiền homestay), nhập ở tab Khoản chi: A trả, chia cho B.
                   </div>
@@ -791,10 +795,10 @@ export default function TripPage() {
               )}
 
               {formError && (
-                <div role="alert" style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{formError}</div>
+                <div role="alert" style={{ fontSize: 13, color: C.ink, background: C.attention, borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{formError}</div>
               )}
               <button type="button" onClick={addEntry} disabled={busy}
-                style={{ width: "100%", padding: 12, background: busy ? "#c4ccd0" : (fType === "expense" ? C.coral : C.purple), color: fType === "expense" || busy ? C.ink : "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer" }}>
+                style={{ width: "100%", padding: 12, background: busy ? C.fill : (fType === "expense" ? C.coral : C.purple), color: busy ? C.text2 : fType === "expense" ? C.ink : "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: busy ? "wait" : "pointer" }}>
                 {busy ? "Đang lưu..." : editingId ? "Cập nhật khoản này" : (fType === "expense" ? "Lưu khoản chi" : "Ghi nhận trả nợ")}
               </button>
             </div>
@@ -803,13 +807,13 @@ export default function TripPage() {
   return (
     <div style={{ minHeight: "100vh", background: C.paper, color: C.ink }}>
       <style>{`
-        .chip { display:inline-flex; align-items:center; gap:5px; padding:8px 14px; border:none; border-radius:999px; white-space:nowrap; background:#EDF5FA; color:${C.ink}; cursor:pointer; font:inherit; font-size:13.5px; user-select:none; transition: background-color .15s, color .15s; }
+        .chip { display:inline-flex; align-items:center; gap:5px; padding:8px 14px; border:none; border-radius:999px; white-space:nowrap; background:${C.fill}; color:${C.ink}; cursor:pointer; font:inherit; font-size:13.5px; user-select:none; transition: background-color .15s, color .15s; }
         .chip.on { background:${C.tealText}; color:#fff; }
         .entry { transition: box-shadow .15s, transform .1s; }
         .entry:hover { box-shadow: 0 2px 8px rgba(2,48,71,.12) !important; }
         .entry:active { transform: scale(.99); }
         @media (prefers-reduced-motion: reduce) { .chip, .entry { transition: none; } .entry:active { transform: none; } }
-        .inp { width:100%; padding:10px 12px; border:none; border-radius:10px; background:#EDF5FA; font-size:14px; outline:none; box-shadow:0 0 0 0 rgba(33,158,188,0); transition: box-shadow .15s; }
+        .inp { width:100%; padding:10px 12px; border:none; border-radius:10px; background:${C.fill}; font-size:14px; outline:none; box-shadow:0 0 0 0 rgba(33,158,188,0); transition: box-shadow .15s; }
         .inp:focus { box-shadow:0 0 0 2px ${C.teal}; }
         .receipt { background:#fff; border-radius:14px; position:relative; box-shadow:0 1px 3px rgba(2,48,71,.08); }
         .receipt:before { content:""; position:absolute; top:-7px; left:0; right:0; height:14px;
@@ -817,7 +821,7 @@ export default function TripPage() {
         .tabs-wide .tabbtn { padding-left:18px; padding-right:18px; }
         .tabbtn { flex:1; padding:11px 0; border:none; background:transparent; font-size:14px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; color:${C.text2}; }
         .tabbtn.on { color:${C.tealDark}; border-bottom-color:${C.coral}; }
-        .typebtn { flex:1; padding:11px 0; border:none; background:#EDF5FA; font-size:13.5px; font-weight:600; cursor:pointer; color:${C.text2}; }
+        .typebtn { flex:1; padding:11px 0; border:none; background:${C.fill}; font-size:13.5px; font-weight:600; cursor:pointer; color:${C.text2}; }
         .typebtn.on { background:${C.ink}; color:#fff; }
         .sheet { animation: sheet-up .22s cubic-bezier(.16,1,.3,1); }
         .scrim { animation: scrim-in .2s ease-out; }
@@ -841,7 +845,7 @@ export default function TripPage() {
             <div style={{ display: "grid", gap: 14 }}>
               <div style={{ textAlign: "center" }}>
                 <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none", color: "#fff" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill={C.sun} style={{ transform: "rotate(45deg)" }} aria-hidden="true">
                     <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                   </svg>
                   <span style={BRAND_TEXT}>TripSplit</span>
@@ -858,7 +862,7 @@ export default function TripPage() {
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
-                  <div style={{ fontSize: 21, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", lineHeight: 1.2 }}>{fmt(totalVND)}</div>
+                  <div style={{ fontSize: 21, fontWeight: 800, marginTop: 2, color: C.sun, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", lineHeight: 1.2 }}>{fmt(totalVND)}</div>
                 </div>
               </div>
             </div>
@@ -867,7 +871,7 @@ export default function TripPage() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
                 <div style={{ minWidth: 0 }}>
                   <Link href="/" aria-label="Về trang chủ TripSplit" style={{ display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none", color: "#fff", padding: "4px 0" }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB703" style={{ transform: "rotate(45deg)" }} aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill={C.sun} style={{ transform: "rotate(45deg)" }} aria-hidden="true">
                       <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                     </svg>
                     <span style={BRAND_TEXT}>TripSplit</span>
@@ -882,7 +886,7 @@ export default function TripPage() {
                 {/* Cuống vé: vạch đứt như đường xé vé — ăn rơ với hóa đơn răng cưa ở tab Tổng kết */}
                 <div style={{ ...TEAR_LINE, paddingLeft: 12, textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize: 9.5, letterSpacing: 2, opacity: 0.7, fontWeight: 600 }}>TỔNG CHI</div>
-                  <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: "#FFB703", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt(totalVND)}</div>
+                  <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2, color: C.sun, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt(totalVND)}</div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
@@ -923,7 +927,7 @@ export default function TripPage() {
           <div style={wide ? { display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(0,1fr)", gap: 24, alignItems: "start" } : undefined}>
           <div>
             {showTips && !askWho && (
-              <div style={{ background: "#F3F8FB", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+              <div style={{ background: C.fill, borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: C.ink, marginBottom: 8 }}>Cách dùng</div>
                 {[
                   "Chưa gửi link cho cả nhóm thì bấm Mời bạn ở trên để copy link, rồi dán vào group chat.",
@@ -982,7 +986,7 @@ export default function TripPage() {
                 // Cả hàng là một nút: bấm để đổ khoản này lên form sửa
                 <button type="button" key={e.id} className="btn-reset entry" onClick={() => startEdit(e)} aria-current={isEditing || undefined}
                   aria-label={`Sửa ${isTransfer ? `${nameOf(e.payer_id)} trả nợ ${nameOf(e.participant_ids[0])}` : e.name}, ${fmt(vnd)}`}
-                  style={{ width: "100%", background: isTransfer ? "#E8F4F9" : "#fff", boxShadow: isEditing ? `0 0 0 2px ${C.coral}` : "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 12px 12px 14px", marginBottom: 9, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  style={{ width: "100%", background: isTransfer ? C.fill : "#fff", boxShadow: isEditing ? `0 0 0 2px ${C.coral}` : "0 1px 3px rgba(2,48,71,.08)", borderRadius: 12, padding: "12px 12px 12px 14px", marginBottom: 9, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     {isTransfer ? (
                       <>
@@ -1024,7 +1028,7 @@ export default function TripPage() {
           {wide && (
             // Máy tính: form luôn mở bên phải, bấm một khoản bên trái để nạp vào đây mà sửa
             <aside aria-labelledby="panel-title"
-              style={{ position: "sticky", top: 60, background: editingId ? "#FFF9F2" : "#fff", borderRadius: 14, boxShadow: editingId ? `0 0 0 2px ${C.coral}, 0 4px 16px rgba(2,48,71,.10)` : "0 4px 16px rgba(2,48,71,.10)", padding: 18, maxHeight: "calc(100vh - 80px)", overflowY: "auto" }}>
+              style={{ position: "sticky", top: 60, background: editingId ? C.attention : "#fff", borderRadius: 14, boxShadow: editingId ? `0 0 0 2px ${C.coral}, 0 4px 16px rgba(2,48,71,.10)` : "0 4px 16px rgba(2,48,71,.10)", padding: 18, maxHeight: "calc(100vh - 80px)", overflowY: "auto" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
                 <h2 id="panel-title" style={{ flex: 1, fontSize: 17, fontWeight: 800, color: C.ink }}>{editingId ? "Sửa khoản đã nhập" : "Thêm khoản mới"}</h2>
                 {editingId && (
@@ -1051,7 +1055,7 @@ export default function TripPage() {
             {/* "Phần của bạn": câu trả lời cuối chuyến (chuyển cho ai, bao nhiêu) nằm ngay đầu tab */}
             {(() => {
               const card = { background: "#fff", boxShadow: "0 1px 3px rgba(2,48,71,.08)", borderRadius: 14, padding: 16, display: "grid", gap: 10 };
-              const row = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#F3F8FB", borderRadius: 10, padding: "10px 12px" };
+              const row = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: C.fill, borderRadius: 10, padding: "10px 12px" };
               const bigLabel = { fontSize: 13, color: C.text2 };
               const bigNum = (color) => ({ fontSize: 24, fontWeight: 800, color, fontVariantNumeric: "tabular-nums", lineHeight: 1.2 });
 
@@ -1075,7 +1079,7 @@ export default function TripPage() {
 
               if (outgoing.length > 0) {
                 return (
-                  <div style={{ ...card, borderTop: `3px solid ${C.coral}` }}>
+                  <div style={{ ...card, borderTop: `3px solid ${C.orangeText}` }}>
                     <div>
                       <div style={bigLabel}>Bạn cần chuyển tổng cộng</div>
                       <div style={bigNum(C.orangeText)}>{fmt(sum(outgoing))}</div>
@@ -1165,7 +1169,7 @@ export default function TripPage() {
                   // Tên người trả → người nhận trên một hàng, số tiền bên dưới, nút QR canh phải:
                   // không còn tràn khỏi hóa đơn trên màn hình 375px
                   return (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", columnGap: 10, rowGap: 2, alignItems: "center", padding: "10px 8px", margin: "0 -4px", borderRadius: 10, background: mineRow ? "#F3F8FB" : "transparent" }}>
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", columnGap: 10, rowGap: 2, alignItems: "center", padding: "10px 8px", margin: "0 -4px", borderRadius: 10, background: mineRow ? C.fill : "transparent" }}>
                       <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
                         <span style={{ color: C.orangeText }}>{t.from}{t.fromId === meId ? " (bạn)" : ""}</span>
                         <ArrowRight size={14} weight="bold" color={C.text2} aria-label="chuyển cho" />
@@ -1176,7 +1180,7 @@ export default function TripPage() {
                           <Scan size={15} weight="bold" aria-hidden="true" />Quét QR
                         </button>
                       ) : t.toId === meId ? (
-                        <label style={{ ...qrBtn, background: "#EDF5FA", color: C.ink }}>
+                        <label style={{ ...qrBtn, background: C.fill, color: C.ink }}>
                           <Plus size={14} weight="bold" aria-hidden="true" />{qrBusyId === meId ? "Đang tải..." : "Thêm QR"}
                           <input type="file" accept="image/*" className="sr-only"
                             onChange={(ev) => uploadQR(me, ev.target.files[0])} />
@@ -1208,7 +1212,7 @@ export default function TripPage() {
                       const from = transactions.filter((t) => t.toId === m.id).length;
                       const label = m.id === meId ? "bạn" : m.name;
                       return (
-                        <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 0", borderTop: idx === 0 ? "none" : "1px solid #E8F0F5" }}>
+                        <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 0", borderTop: idx === 0 ? "none" : `1px solid ${C.line}` }}>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 700, fontSize: 14 }}>{m.name}{m.id === meId && <span style={{ fontWeight: 400, color: C.text2 }}> (bạn)</span>}</div>
                             <div style={{ fontSize: 12.5, color: C.text2 }}>nhận {fmt(balances[m.id].net)}{from > 0 ? ` từ ${from} người` : ""}</div>
@@ -1225,7 +1229,7 @@ export default function TripPage() {
                               </label>
                             </div>
                           ) : (
-                            <label style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, color: C.ink, fontWeight: 700, background: "#EDF5FA", borderRadius: 9, padding: "9px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                            <label style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, color: C.ink, fontWeight: 700, background: C.fill, borderRadius: 9, padding: "9px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>
                               <Plus size={14} weight="bold" aria-hidden="true" />{qrBusyId === m.id ? "Đang tải ảnh..." : `Thêm QR của ${label}`}
                               <input type="file" accept="image/*" className="sr-only" onChange={(ev) => uploadQR(m, ev.target.files[0])} />
                             </label>
@@ -1266,7 +1270,7 @@ export default function TripPage() {
                 const num = (n) => (wide ? Math.round(n).toLocaleString("vi-VN") : fmtK(n));
                 const signed = (n) => (Math.abs(n) < 1 ? "0" : (n > 0 ? "+" : "−") + num(Math.abs(n)));
                 const th = { fontSize: 12, fontWeight: 600, color: C.text2, textAlign: "right", padding: "0 0 8px 8px", whiteSpace: "nowrap" };
-                const td = { textAlign: "right", padding: "9px 0 9px 8px", borderTop: "1px solid #E8F0F5", whiteSpace: "nowrap" };
+                const td = { textAlign: "right", padding: "9px 0 9px 8px", borderTop: `1px solid ${C.line}`, whiteSpace: "nowrap" };
                 return (
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, fontVariantNumeric: "tabular-nums", tableLayout: "auto" }}>
                     <thead>
@@ -1303,12 +1307,12 @@ export default function TripPage() {
 
             <h2 style={sectionHead}>Fact thú vị</h2>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
-              <div style={{ background: C.coral, color: C.ink, borderRadius: 12, padding: 14 }}>
+              <div style={{ background: C.sun, color: C.ink, borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.75 }}>Đại gia của chuyến đi 👑</div>
                 <div style={{ fontWeight: 800, fontSize: 17, marginTop: 3 }}>{hasTopSpender ? topSpender.name : "—"}</div>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>{hasTopSpender ? "ứng trước " + fmt(paidReal[topSpender.id]) : ""}</div>
               </div>
-              <div style={{ background: "#FFB703", color: C.ink, borderRadius: 12, padding: 14 }}>
+              <div style={{ background: C.sand, color: C.ink, borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 11, opacity: 0.85 }}>Khoản chi khủng nhất 💸</div>
                 <div style={{ fontWeight: 800, fontSize: 14.5, marginTop: 3, color: C.ink }}>{biggestExpense?.name || "—"}</div>
                 <div style={{ fontSize: 12 }}>{biggestExpense ? fmt(toVND(biggestExpense.amount, biggestExpense.currency, rates)) : ""}</div>
@@ -1362,7 +1366,7 @@ export default function TripPage() {
           const nameHeader = (
             <tr>
               <th style={{ ...thStyle, ...stickyLeft, zIndex: 2 }}></th>
-              {orderedMembers.map((m) => <th key={m.id} scope="col" style={{ ...thStyle, ...(m.id === meId ? { background: "#E8F4F9", borderRadius: 6 } : {}) }}>{m.name}</th>)}
+              {orderedMembers.map((m) => <th key={m.id} scope="col" style={{ ...thStyle, ...(m.id === meId ? { background: C.fill, borderRadius: 6 } : {}) }}>{m.name}</th>)}
             </tr>
           );
           const itemColW = wide ? 220 : 104; // cột tên khoản: máy tính đủ chỗ để tên nằm trên một dòng
@@ -1392,7 +1396,7 @@ export default function TripPage() {
             return (
               <tr key={e.id}>
                 <td onClick={() => { setTab("expenses"); startEdit(e); }}
-                  style={{ ...itemCell, background: isT ? "#E8F4F9" : "#fff", cursor: "pointer" }}>
+                  style={{ ...itemCell, background: isT ? C.fill : "#fff", cursor: "pointer" }}>
                   <div style={{ fontWeight: 700, color: C.ink }}>{isT ? "Trả nợ" : e.name}</div>
                   <div style={subStyle}>
                     {isT ? `${nameOf(e.payer_id)} → ${nameOf(e.participant_ids[0])}` : `${nameOf(e.payer_id)} trả`} · {fmtK(vnd)}
@@ -1426,7 +1430,7 @@ export default function TripPage() {
 
           return (
             <>
-              <div style={{ fontSize: 12.5, color: C.text2, background: "#F3F8FB", borderRadius: 10, padding: "10px 12px", marginBottom: 12, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12.5, color: C.text2, background: C.fill, borderRadius: 10, padding: "10px 12px", marginBottom: 12, lineHeight: 1.5 }}>
                 Xem lại trước khi chuyển tiền: có khoản nào thừa hoặc thiếu không, mỗi khoản chia đúng người và đúng số tiền chưa.
                 Thấy sai thì bấm tên khoản để sửa.
               </div>
@@ -1508,7 +1512,7 @@ export default function TripPage() {
         <div className="scrim" onClick={closeSheet}
           style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.45)", zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" onClick={(e) => e.stopPropagation()}
-            style={{ background: editingId ? "#FFF9F2" : "#fff", width: "100%", maxWidth: 640, maxHeight: "92dvh", overflowY: "auto", borderRadius: "18px 18px 0 0", padding: "8px 16px calc(16px + env(safe-area-inset-bottom, 0px))", boxShadow: "0 -8px 30px rgba(2,48,71,.18)" }}>
+            style={{ background: editingId ? C.attention : "#fff", width: "100%", maxWidth: 640, maxHeight: "92dvh", overflowY: "auto", borderRadius: "18px 18px 0 0", padding: "8px 16px calc(16px + env(safe-area-inset-bottom, 0px))", boxShadow: "0 -8px 30px rgba(2,48,71,.18)" }}>
             <div style={{ width: 38, height: 4, borderRadius: 4, background: C.line, margin: "0 auto 8px" }} aria-hidden="true" />
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
               <h2 id="sheet-title" style={{ flex: 1, fontSize: 17, fontWeight: 800, color: C.ink }}>{editingId ? "Sửa khoản đã nhập" : "Thêm khoản mới"}</h2>
@@ -1520,7 +1524,7 @@ export default function TripPage() {
                 </button>
               )}
               <button type="button" onClick={closeSheet} aria-label="Đóng"
-                style={{ border: "none", background: "#EDF5FA", color: C.ink, cursor: "pointer", borderRadius: 999, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                style={{ border: "none", background: C.fill, color: C.ink, cursor: "pointer", borderRadius: 999, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <X size={16} weight="bold" />
               </button>
             </div>
@@ -1578,7 +1582,7 @@ export default function TripPage() {
               {steps.map((sec, si) => (
                 <section key={sec.title} style={{ marginTop: 18 }}>
                   <h3 style={{ fontSize: 15, fontWeight: 800, color: C.ink, display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 999, background: C.coral, color: C.ink, fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{si + 1}</span>
+                    <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 999, background: C.sun, color: C.ink, fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{si + 1}</span>
                     {sec.title}
                   </h3>
                   <ul style={{ listStyle: "none", display: "grid", gap: 6, paddingLeft: 30 }}>
@@ -1592,7 +1596,7 @@ export default function TripPage() {
                 </section>
               ))}
 
-              <section style={{ marginTop: 20, background: "#F3F8FB", borderRadius: 12, padding: "12px 14px" }}>
+              <section style={{ marginTop: 20, background: C.fill, borderRadius: 12, padding: "12px 14px" }}>
                 <h3 style={{ fontSize: 14, fontWeight: 800, color: C.ink, marginBottom: 8 }}>Các nút trên cùng</h3>
                 <dl style={{ display: "grid", gap: 8 }}>
                   {buttons.map(([name, desc]) => (
@@ -1693,7 +1697,7 @@ export default function TripPage() {
                 <Plus size={14} weight="bold" aria-hidden="true" />Thêm
               </button>
             </div>
-            {curError && <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "8px 12px", marginTop: 8 }}>{curError}</div>}
+            {curError && <div style={{ fontSize: 13, color: C.ink, background: C.attention, borderRadius: 10, padding: "8px 12px", marginTop: 8 }}>{curError}</div>}
             <div style={{ fontSize: 11.5, color: C.text2, marginTop: 10 }}>
               Cả nhóm dùng chung các tỉ giá này. Sửa xong nhớ bấm Lưu tỉ giá.
             </div>
@@ -1718,11 +1722,11 @@ export default function TripPage() {
               style={{ marginBottom: 16 }} />
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setMemberModal(null)}
-                style={{ flex: 1, background: "#EDF5FA", border: "none", color: C.ink, borderRadius: 10, padding: "10px 0", fontWeight: 600, cursor: "pointer", fontSize: 14 }}>
+                style={{ flex: 1, background: C.fill, border: "none", color: C.ink, borderRadius: 10, padding: "10px 0", fontWeight: 600, cursor: "pointer", fontSize: 14 }}>
                 Hủy
               </button>
               <button onClick={submitMemberModal} disabled={memberBusy || !memberNameInput.trim()}
-                style={{ flex: 1, background: memberBusy ? "#c4ccd0" : C.coral, border: "none", color: C.ink, borderRadius: 10, padding: "10px 0", fontWeight: 700, cursor: memberBusy ? "wait" : "pointer", fontSize: 14 }}>
+                style={{ flex: 1, background: memberBusy ? C.fill : C.coral, border: "none", color: memberBusy ? C.text2 : C.ink, borderRadius: 10, padding: "10px 0", fontWeight: 700, cursor: memberBusy ? "wait" : "pointer", fontSize: 14 }}>
                 {memberBusy ? "Đang lưu..." : "Lưu"}
               </button>
             </div>
@@ -1740,7 +1744,7 @@ export default function TripPage() {
             </div>
             {members.map((m) => (
               <button key={m.id} onClick={() => chooseMe(m.id)}
-                style={{ display: "block", width: "100%", textAlign: "left", background: "#EDF5FA", border: "none", borderRadius: 10, padding: "14px 16px", fontSize: 15, fontWeight: 600, color: C.ink, cursor: "pointer", marginBottom: 8 }}>
+                style={{ display: "block", width: "100%", textAlign: "left", background: C.fill, border: "none", borderRadius: 10, padding: "14px 16px", fontSize: 15, fontWeight: 600, color: C.ink, cursor: "pointer", marginBottom: 8 }}>
                 {m.name}
               </button>
             ))}
@@ -1773,7 +1777,7 @@ export default function TripPage() {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setDeleteTarget(null)} disabled={deleting}
-                style={{ flex: 1, background: "#EDF5FA", border: "none", color: C.ink, borderRadius: 10, padding: "12px 0", fontWeight: 600, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap" }}>
+                style={{ flex: 1, background: C.fill, border: "none", color: C.ink, borderRadius: 10, padding: "12px 0", fontWeight: 600, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap" }}>
                 Giữ lại
               </button>
               <button onClick={confirmDelete} disabled={deleting}
@@ -1797,7 +1801,7 @@ export default function TripPage() {
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setLoginPrompt(false)}
-                style={{ flex: 1, background: "#EDF5FA", border: "none", color: C.ink, borderRadius: 10, padding: "12px 0", fontWeight: 600, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap" }}>
+                style={{ flex: 1, background: C.fill, border: "none", color: C.ink, borderRadius: 10, padding: "12px 0", fontWeight: 600, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap" }}>
                 Để sau
               </button>
               <button onClick={startLogin}
@@ -1810,20 +1814,24 @@ export default function TripPage() {
       )}
 
       {/* Thông báo ngắn ở đáy màn hình: cố định, không đẩy nội dung. Bấm để tắt. */}
+      {/* Lỗi cũng nền xanh đậm như thông báo thường (cam chỉ dành cho nút hành động), phân biệt bằng icon cảnh báo vàng */}
       {toast && (
-        <div onClick={() => setToast(null)}
+        <div role={toast.kind === "error" ? "alert" : "status"} onClick={() => setToast(null)}
           style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(20px + env(safe-area-inset-bottom, 0px))", zIndex: 90, maxWidth: "calc(100% - 32px)", width: "max-content",
-            background: toast.kind === "error" ? C.coral : C.ink, color: toast.kind === "error" ? C.ink : "#fff",
+            background: C.ink, color: "#fff", display: "flex", alignItems: "flex-start", gap: 9,
             borderRadius: 12, padding: "11px 16px", fontSize: 13.5, fontWeight: 600, lineHeight: 1.4, cursor: "pointer" }}>
-          <div>{toast.text}</div>
-          {toast.detail && <div style={{ fontSize: 11.5, fontWeight: 400, marginTop: 3, wordBreak: "break-word" }}>{toast.detail}</div>}
+          {toast.kind === "error" && <WarningCircle size={18} weight="fill" color={C.sun} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />}
+          <div>
+            <div>{toast.text}</div>
+            {toast.detail && <div style={{ fontSize: 11.5, fontWeight: 400, marginTop: 3, wordBreak: "break-word", opacity: 0.8 }}>{toast.detail}</div>}
+          </div>
         </div>
       )}
 
       {/* Modal phóng to QR */}
       {qrView && memberOf(qrView)?.qr_url && (
         <div onClick={() => setQrView(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(27,42,51,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, cursor: "pointer", padding: 20 }}>
+          style={{ position: "fixed", inset: 0, background: "rgba(2,48,71,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, cursor: "pointer", padding: 20 }}>
           <div role="dialog" aria-modal="true" aria-label={`Mã QR của ${nameOf(qrView)}`} onClick={(e) => e.stopPropagation()}
             style={{ background: "#fff", borderRadius: 16, padding: 20, textAlign: "center", maxWidth: 360, width: "100%", maxHeight: "calc(100dvh - 40px)", display: "flex", flexDirection: "column", cursor: "default" }}>
             <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 12, flexShrink: 0 }}>Chuyển tiền cho {nameOf(qrView)}</div>
@@ -1831,11 +1839,11 @@ export default function TripPage() {
             <img src={memberOf(qrView).qr_url} alt={`QR của ${nameOf(qrView)}`}
               style={{ display: "block", maxWidth: "100%", width: "auto", height: "auto", maxHeight: "100%", minHeight: 0, flex: "0 1 auto", objectFit: "contain", alignSelf: "center", borderRadius: 10 }} />
             {/* Ai có link cũng đổi được ảnh QR, nên nhắc người chuyển tự kiểm tra tên chủ tài khoản */}
-            <div style={{ fontSize: 13, color: C.ink, background: "#FFF3D6", borderRadius: 10, padding: "9px 12px", marginTop: 12, lineHeight: 1.45, textAlign: "left", flexShrink: 0 }}>
+            <div style={{ fontSize: 13, color: C.ink, background: C.attention, borderRadius: 10, padding: "9px 12px", marginTop: 12, lineHeight: 1.45, textAlign: "left", flexShrink: 0 }}>
               Trước khi chuyển, kiểm tra tên chủ tài khoản trong app ngân hàng đúng là {nameOf(qrView)}.
             </div>
             <button onClick={() => setQrView(null)}
-              style={{ marginTop: 14, width: "100%", padding: 10, background: "#023047", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>
+              style={{ marginTop: 14, width: "100%", padding: 10, background: C.ink, color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>
               Đóng
             </button>
           </div>
